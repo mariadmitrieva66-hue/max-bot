@@ -94,6 +94,13 @@ class handler(BaseHTTPRequestHandler):
 
         try:
             data = json.loads(post_data.decode('utf-8'))
+                        
+            # === ДОБАВЛЕННЫЙ КОД ДЛЯ ОТЛАДКИ ===
+            print("=== ПОЛУЧЕНО ОТ MAX ===")
+            print(json.dumps(data, ensure_ascii=False, indent=2))
+            print("=========================")
+            # =================================
+            
             update_type = data.get('update_type')
             chat_id = data.get('chat_id')
 
