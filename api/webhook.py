@@ -8,6 +8,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 MAX_TOKEN = os.getenv('MAX_TOKEN')
 API_BASE = 'https://platform-api2.max.ru'
+REGISTRATION_URL = "https://forms.mchs.gov.ru/registration_tourist_groups"
 
 def send_message(chat_id: int, text: str, buttons: list = None):
     if not chat_id:
@@ -40,13 +41,18 @@ def send_message(chat_id: int, text: str, buttons: list = None):
 
 def btn(text: str, payload: str):
     return {"type": "callback", "text": text, "payload": payload}
+  
+# === ДОБАВЬТЕ ЭТУ НОВУЮ ФУНКЦИЮ ===
+def btn_link(text: str, url: str):
+    """Создает кнопку-ссылку (открывает сайт в новой вкладке)"""
+    return {"type": "link", "text": text, "url": url}
 
 def main_menu():
     return [
         [btn("🔥 Что делать при ЧС", "emergency_menu")],
         [btn("⚠️ Предупреждения", "warnings")],
         [btn("📞 Контакты", "contacts")],
-        [btn("📝 Регистрация туристских групп", "registration")]
+        [btn_link("📝 Регистрация туристских групп", REGISTRATION_URL)]
     ]
 
 def emergency_menu():
@@ -77,8 +83,6 @@ def handle_command(chat_id: int, command: str):
         send_message(chat_id, "⚠️ ВНИМАНИЕ!\n\nПо данным Сахалинского УГМС, сегодня в регионе ожидается усиление ветра до 20 м/с.", back_menu())
     elif command in ['contacts', 'контакты']:
         send_message(chat_id, "📞 Экстренные службы:\n\n112 - Единый номер вызова\n101 - Пожарные\n102 - Полиция\n103 - Скорая помощь", back_menu())
-    elif command in ['registration', 'регистрация туристских групп']:
-        send_message(chat_id, "📝 Функция регистрации в разработке. Позвоните в Агентство.", back_menu())
     else:
         send_message(chat_id, "Я вас не понял. Используйте кнопки меню:", main_menu())
 
