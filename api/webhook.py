@@ -14,16 +14,20 @@ def send_message(chat_id: int, text: str, buttons: list = None):
         print("⚠️ chat_id пустой, пропускаю отправку")
         return
         
-    url = f'{API_BASE}/messages'
+    # ГЛАВНОЕ ИЗМЕНЕНИЕ: chat_id передается прямо в URL!
+    url = f'{API_BASE}/messages?chat_id={chat_id}'
+    
     headers = {
         'Authorization': MAX_TOKEN,
         'Content-Type': 'application/json'
     }
-    # ВАЖНО: в MAX API recipient именно так!
+    
+    # В теле запроса (payload) больше нет объекта 'recipient'!
+    # Там остается только сам текст и кнопки.
     payload = {
-        'recipient': {'chat_id': chat_id},
         'text': text
     }
+    
     if buttons:
         payload['attachments'] = [{
             'type': 'inline_keyboard',
