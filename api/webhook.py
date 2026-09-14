@@ -94,12 +94,23 @@ class handler(BaseHTTPRequestHandler):
 
         try:
             data = json.loads(post_data.decode('utf-8'))
-                        
-            # === ДОБАВЛЕННЫЙ КОД ДЛЯ ОТЛАДКИ ===
-            print("=== ПОЛУЧЕНО ОТ MAX ===")
-            print(json.dumps(data, ensure_ascii=False, indent=2))
-            print("=========================")
-            # =================================
+            
+            # === НОВАЯ, БОЛЕЕ ТОЧНАЯ ОТЛАДКА ===
+            print("=== ПОЛНАЯ СТРУКТУРА ДАННЫХ ОТ MAX ===")
+            print("1. Все ключи верхнего уровня:", list(data.keys()))
+            print("2. Значение chat_id:", data.get('chat_id'))
+            print("3. Тип обновления (update_type):", data.get('update_type'))
+            
+            if 'message' in data:
+                print("4. Объект message целиком:", data['message'])
+                print("5. Ключи внутри message:", list(data['message'].keys()))
+                
+                # Пробуем разные варианты извлечения текста
+                body = data['message'].get('body', {})
+                print("6. Объект body:", body)
+                print("7. Текст сообщения (body.text):", body.get('text') if isinstance(body, dict) else body)
+            print("====================================")
+            # ==========================================
             
             update_type = data.get('update_type')
             chat_id = data.get('chat_id')
@@ -107,8 +118,18 @@ class handler(BaseHTTPRequestHandler):
             if update_type == 'bot_started':
                 handle_command(chat_id, '/start')
             elif update_type == 'message_created':
-                text = data.get('message', {}).get('body', {}).get('text', '')
+                # Извлекаем текст, проверяя разные возможные структуры
+                message_obj = data.get('message', {})
+                body = message_obj.get('body', {})
+                
+                if isinstance(body, dict):
+                    text = body.get('text', '')
+                else:
+                    text = str(body) # если body это сразу строка
+                
+                print(f"ИТОГОВЫЙ ТЕКСТ ДЛЯ ОБРАБОТКИ: '{text}'")
                 handle_command(chat_id, text)
+                
             elif update_type == 'message_callback':
                 payload = (data.get('callback', {}).get('payload') or 
                            data.get('payload') or 
@@ -122,7 +143,9 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps({'status': 'ok'}).encode('utf-8'))
 
         except Exception as e:
-            print(f"Error: {e}")
+            print(f"КРИТИЧЕСКАЯ ОШИБКА: {e}")
+            import traceback
+            traceback.print_exc()
             self.send_response(500)
             self.end_headers()
 
