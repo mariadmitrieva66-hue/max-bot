@@ -66,10 +66,6 @@ def btn_link(text, url):
     """Кнопка-ссылка (открывает сайт в новой вкладке)"""
     return {"type": "link", "text": text, "url": url}
 
-def btn_contact(text):
-    """Кнопка запроса контакта пользователя"""
-    return {"type": "request_contact", "text": text}
-
 
 def main_menu():
     return [
@@ -87,12 +83,6 @@ def emergency_menu():
         [btn("❌ Отмена (Главное меню)", "main")]
     ]
 
-def contacts_menu():
-    return [
-        [btn_contact("📱 Поделиться контактом")],
-        [btn("🏠 Главное меню", "main")]
-    ]
-
 def back_menu():
     return [[btn("🏠 Главное меню", "main")]]
 
@@ -106,8 +96,8 @@ def handle_command(chat_id, command):
             "Здравствуйте! Это бот Агентства по делам ГО, ЧС и ПБ "
             "Сахалинской области.\n\n"
             "**💡 Как пользоваться:**\n"
-            "• выберите раздел через кнопки меню ниже\n"
-            "• или просто введите ключевые слова: `пожар`, `спасатели`, "
+            "• Выберите раздел через кнопки меню ниже\n"
+            "• Или просто введите ключевые слова: `пожар`, `спасатели`, "
             "`градусник`, `огнетушитель`, `наводнение`, `цунами`, `землетрясение` "
             "— и мгновенно получите информацию, как действовать\n\n"
             "Для начала работы нажмите кнопку ниже или введите нужное слово:",
@@ -127,13 +117,11 @@ def handle_command(chat_id, command):
             "• Покиньте помещение, закрывая за собой двери;\n"
             "• Двигайтесь пригнувшись, дышите через влажную ткань;\n"
             "• На улице отойдите от здания на безопасное расстояние.\n\n"
-           
             "❌ **НЕЛЬЗЯ:**\n"
             "• Пользоваться лифтом;\n"
             "• Возвращаться за вещами;\n"
             "• Открывать окна (приток кислорода усилит огонь);\n"
             "• Тушить электроприборы водой под напряжением.\n\n"
-
             "💡 **Если путь отрезан огнём:**\n"
             "• Закройтесь в комнате, заткните щели влажной тканью;\n"
             "• Подавайте сигналы из окна;\n"
@@ -214,9 +202,8 @@ def handle_command(chat_id, command):
             "• `112` — единый номер вызова экстренных служб\n"
             "• `101` — пожарные\n"
             "• `102` — полиция\n"
-            "• `103` — скорая помощь\n\n"
-            "Нажмите кнопку ниже, чтобы оставить свой контакт для обратной связи:",
-            contacts_menu())
+            "• `103` — скорая помощь",
+            back_menu())
 
     elif command in ['registration', 'регистрация туристских групп', '/registration']:
         send_message(chat_id,
@@ -253,16 +240,9 @@ class handler(BaseHTTPRequestHandler):
                     handle_command(chat_id, '/start')
 
             elif update_type == 'message_created':
-                attachments = message.get('attachments', [])
-                if any(a.get('type') == 'contact' for a in attachments):
-                    send_message(chat_id,
-                        "**✅ Спасибо!** Ваш контакт получен.\n"
-                        "Специалист Агентства свяжется с вами.",
-                        back_menu())
-                else:
-                    body = message.get('body', {})
-                    text = body.get('text', '') if isinstance(body, dict) else str(body)
-                    handle_command(chat_id, text)
+                body = message.get('body', {})
+                text = body.get('text', '') if isinstance(body, dict) else str(body)
+                handle_command(chat_id, text)
 
             elif update_type == 'message_callback':
                 callback = data.get('callback', {})
