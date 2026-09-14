@@ -4,6 +4,10 @@
     {
       "src": "api/webhook.py",
       "use": "@vercel/python"
+    },
+    {
+      "src": "api/register.py",
+      "use": "@vercel/python"
     }
   ],
   "routes": [
