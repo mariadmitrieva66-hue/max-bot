@@ -24,7 +24,9 @@ class handler(BaseHTTPRequestHandler):
             'update_types': ['message_created', 'bot_started', 'message_callback']
         }
         
-        response = requests.post(url, headers=headers, json=payload, timeout=10)
+import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        response = requests.post(url, headers=headers, json=payload, timeout=10, verify=False)
         
         self.send_response(200)
         self.send_header('Content-type', 'application/json')
