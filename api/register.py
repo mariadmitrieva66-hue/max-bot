@@ -10,8 +10,9 @@ class handler(BaseHTTPRequestHandler):
         
         if not WEBHOOK_URL:
             self.send_response(400)
+            self.send_header('Content-type', 'application/json')
             self.end_headers()
-            self.wfile.write(b'Missing WEBHOOK_URL env variable')
+            self.wfile.write(json.dumps({'error': 'Missing WEBHOOK_URL env variable'}).encode('utf-8'))
             return
 
         url = 'https://platform-api2.max.ru/subscriptions'
@@ -24,7 +25,7 @@ class handler(BaseHTTPRequestHandler):
             'update_types': ['message_created', 'bot_started', 'message_callback']
         }
         
-import urllib3
+        import urllib3
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
         response = requests.post(url, headers=headers, json=payload, timeout=10, verify=False)
         
