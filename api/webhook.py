@@ -33,20 +33,27 @@ def send_message(chat_id, text, buttons=None, image_url=None):
         return
     url = f'{API_BASE}/messages?chat_id={chat_id}'
     headers = {'Authorization': MAX_TOKEN, 'Content-Type': 'application/json'}
-    payload = {'text': text, 'format': 'markdown'}
 
-    attachments = []
-    if image_url:
-        attachments.append({'type': 'image', 'payload': {'url': image_url}})
-    if buttons:
-        attachments.append({'type': 'inline_keyboard', 'payload': {'buttons': buttons}})
-    if attachments:
-        payload['attachments'] = attachments
+    def build_payload(with_image):
+        payload = {'text': text, 'format': 'markdown'}
+        attachments = []
+        if with_image and image_url:
+            attachments.append({'type': 'image', 'payload': {'url': image_url}})
+        if buttons:
+            attachments.append({'type': 'inline_keyboard', 'payload': {'buttons': buttons}})
+        if attachments:
+            payload['attachments'] = attachments
+        return payload
 
-    response = requests.post(url, headers=headers, json=payload, timeout=10, verify=False)
+    response = requests.post(url, headers=headers, json=build_payload(True), timeout=10, verify=False)
     print(f"📤 ОТВЕТ MAX API: {response.status_code} | {response.text}")
-    return response
 
+    # Если MAX не смог скачать картинку — отправляем то же сообщение без неё
+    if response.status_code == 400 and 'image' in response.text.lower():
+        print("⚠️ Картинка не загрузилась, повторяю отправку БЕЗ картинки")
+        response = requests.post(url, headers=headers, json=build_payload(False), timeout=10, verify=False)
+        print(f"📤 ОТВЕТ MAX API (без картинки): {response.status_code} | {response.text}")
+    return response
 
 # --- КОНСТРУКТОРЫ КНОПОК ---
 def btn(text, payload):
