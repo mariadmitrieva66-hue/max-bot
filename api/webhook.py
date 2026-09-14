@@ -23,7 +23,9 @@ def send_message(chat_id: int, text: str, buttons: list = None):
             'payload': {'buttons': buttons}
         }]
     
-    requests.post(url, headers=headers, json=payload, timeout=10)
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+requests.post(url, headers=headers, json=payload, timeout=10, verify=False)
 
 # --- КОНСТРУКТОР КНОПОК ---
 def btn(text: str, payload: str):
