@@ -11,7 +11,7 @@ API_BASE = 'https://platform-api2.max.ru'
 
 def send_message(chat_id: int, text: str, buttons: list = None):
     if not chat_id:
-        print("⚠️ ОШИБКА: chat_id не найден, не могу отправить сообщение!")
+        print("⚠️ chat_id пустой, пропускаю отправку")
         return
         
     url = f'{API_BASE}/messages'
@@ -19,6 +19,7 @@ def send_message(chat_id: int, text: str, buttons: list = None):
         'Authorization': MAX_TOKEN,
         'Content-Type': 'application/json'
     }
+    # ВАЖНО: в MAX API recipient именно так!
     payload = {
         'recipient': {'chat_id': chat_id},
         'text': text
@@ -30,7 +31,8 @@ def send_message(chat_id: int, text: str, buttons: list = None):
         }]
     
     response = requests.post(url, headers=headers, json=payload, timeout=10, verify=False)
-    print(f"📤 ОТВЕТ ОТ MAX (send_message): {response.status_code} {response.text}")
+    print(f"📤 ОТВЕТ MAX API: {response.status_code} | {response.text}")
+    return response
 
 def btn(text: str, payload: str):
     return {"type": "callback", "text": text, "payload": payload}
@@ -60,21 +62,21 @@ def handle_command(chat_id: int, command: str):
     if command in ['/start', 'main', 'главное меню', 'start']:
         send_message(chat_id, "⚠️ БОТ В ТЕСТОВОМ РЕЖИМЕ\n\nЗдравствуйте! Это тестовая версия бота Агентства по делам ГО, ЧС и ПБ Сахалинской области. Выберите раздел:", main_menu())
     elif command in ['emergency_menu', 'что делать при чс']:
-        send_message(chat_id, "️ ТЕСТОВЫЙ РЕЖИМ\nЕсли есть угроза жизни — звоните 112!", emergency_menu())
+        send_message(chat_id, "⚠️ ТЕСТОВЫЙ РЕЖИМ\nЕсли есть угроза жизни — звоните 112!", emergency_menu())
     elif command in ['fire', 'пожар']:
         send_message(chat_id, "🔥 ПОЖАР: что делать\n\n✅ НЕМЕДЛЕННО:\nПозвоните 101 или 112.\nСообщите адрес и что горит.", back_menu())
     elif command in ['flood', 'наводнение', 'цунами']:
         send_message(chat_id, "🌊 НАВОДНЕНИЕ / ЦУНАМИ: что делать\n\n⚠️ При сигнале цунами немедленно уходите от берега! Поднимитесь на возвышенность.", back_menu())
     elif command in ['earthquake', 'землетрясение']:
-        send_message(chat_id, "🏠 ЗЕМЛЕТРЯСЕНИЕ: что делать\n\n✅ ВО ВРЕМЯ ТОЛЧКОВ:\nЕсли вы в здании: встаньте в дверной проём или под прочный стол. Держитесь подальше от окон.", back_menu())
+        send_message(chat_id, "🏠 ЗЕМЛЕТРЯСЕНИЕ: что делать\n\n✅ ВО ВРЕМЯ ТОЛЧКОВ:\nЕсли вы в здании: встаньте в дверной проём или под прочный стол.", back_menu())
     elif command in ['warnings', 'предупреждения']:
-        send_message(chat_id, "⚠️ ВНИМАНИЕ!\n\nПо данным Сахалинского УГМС, сегодня в регионе ожидается усиление ветра до 20 м/с. Соблюдайте осторожность!", back_menu())
+        send_message(chat_id, "⚠️ ВНИМАНИЕ!\n\nПо данным Сахалинского УГМС, сегодня в регионе ожидается усиление ветра до 20 м/с.", back_menu())
     elif command in ['contacts', 'контакты']:
-        send_message(chat_id, "📞 Экстренные службы:\n\n112 - Единый номер вызова экстренных служб\n101 - Пожарные\n102 - Полиция\n103 - Скорая помощь", back_menu())
+        send_message(chat_id, "📞 Экстренные службы:\n\n112 - Единый номер вызова\n101 - Пожарные\n102 - Полиция\n103 - Скорая помощь", back_menu())
     elif command in ['registration', 'регистрация туристских групп']:
-        send_message(chat_id, "📝 Функция регистрации туристских групп находится в разработке. Пожалуйста, позвоните в Агентство.", back_menu())
+        send_message(chat_id, "📝 Функция регистрации в разработке. Позвоните в Агентство.", back_menu())
     else:
-        send_message(chat_id, "Я вас не понял. Пожалуйста, используйте кнопки меню:", main_menu())
+        send_message(chat_id, "Я вас не понял. Используйте кнопки меню:", main_menu())
 
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
@@ -83,48 +85,44 @@ class handler(BaseHTTPRequestHandler):
 
         try:
             data = json.loads(post_data.decode('utf-8'))
-            
-            # === ПОЛНЫЙ ДАМП ДАННЫХ БЕЗ СОКРАЩЕНИЙ ===
-            print("=== ПОЛНЫЙ ДАМП ДАННЫХ ОТ MAX (БЕЗ СОКРАЩЕНИЙ) ===")
-            print(json.dumps(data, ensure_ascii=False, indent=2))
-            print("==================================================")
-            
             update_type = data.get('update_type')
+            message = data.get('message', {})
             
-            # Умный поиск chat_id во всех возможных местах
-            chat_id = data.get('chat_id')
-            if not chat_id and 'message' in data:
-                msg = data['message']
-                chat_id = msg.get('chat_id') or msg.get('id')
-                if 'chat' in msg and isinstance(msg['chat'], dict):
-                    chat_id = msg['chat'].get('id')
-                if 'recipient' in msg and isinstance(msg['recipient'], dict):
-                    chat_id = msg['recipient'].get('chat_id')
+            # === ПЕЧАТАЕМ ВСЕ КЛЮЧЕВЫЕ ПОЛЯ ===
+            print("=== СТРУКТУРА UPDATE ===")
+            print("update_type:", update_type)
+            print("Ключи верхнего уровня:", list(data.keys()))
+            print("Ключи внутри message:", list(message.keys()))
             
-            print(f"🔍 НАЙДЕННЫЙ chat_id: {chat_id}")
+            # Печатаем recipient целиком
+            recipient = message.get('recipient', {})
+            print("🎯 ОБЪЕКТ recipient:", json.dumps(recipient, ensure_ascii=False))
+            
+            # Печатаем sender (отправитель)
+            sender = message.get('sender', {})
+            print("👤 ОБЪЕКТ sender:", json.dumps(sender, ensure_ascii=False))
+            print("=========================")
+            
+            # === ПРАВИЛЬНОЕ ИЗВЛЕЧЕНИЕ chat_id ===
+            chat_id = recipient.get('chat_id')
+            
+            print(f"✅ ИСПОЛЬЗУЕМЫЙ chat_id (из recipient): {chat_id}")
 
             if update_type == 'bot_started':
+                user = data.get('user', {})
+                chat_id = chat_id or user.get('user_id')
                 handle_command(chat_id, '/start')
+                
             elif update_type == 'message_created':
-                msg = data.get('message', {})
-                body = msg.get('body', {})
-                
-                if isinstance(body, dict):
-                    text = body.get('text', '')
-                else:
-                    text = str(body)
-                
-                # Если текст пустой, возможно он лежит в другом месте
-                if not text and 'text' in msg:
-                    text = msg['text']
-                    
-                print(f"💬 ИТОГОВЫЙ ТЕКСТ ДЛЯ ОБРАБОТКИ: '{text}'")
+                body = message.get('body', {})
+                text = body.get('text', '') if isinstance(body, dict) else str(body)
+                print(f"💬 Текст: '{text}'")
                 handle_command(chat_id, text)
                 
             elif update_type == 'message_callback':
-                payload = (data.get('callback', {}).get('payload') or 
-                           data.get('payload') or 
-                           data.get('message', {}).get('callback_payload'))
+                callback = data.get('callback', {})
+                payload = callback.get('payload') or data.get('payload')
+                chat_id = callback.get('chat_id') or chat_id
                 if payload:
                     handle_command(chat_id, payload)
 
@@ -134,7 +132,7 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps({'status': 'ok'}).encode('utf-8'))
 
         except Exception as e:
-            print(f"❌ КРИТИЧЕСКАЯ ОШИБКА: {e}")
+            print(f"❌ ОШИБКА: {e}")
             import traceback
             traceback.print_exc()
             self.send_response(500)
