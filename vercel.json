@@ -1,23 +1,13 @@
 {
   "version": 2,
   "builds": [
-    {
-      "src": "api/webhook.py",
-      "use": "@vercel/python"
-    },
-    {
-      "src": "api/register.py",
-      "use": "@vercel/python"
-    }
+    { "src": "api/webhook.py", "use": "@vercel/python" },
+    { "src": "api/register.py", "use": "@vercel/python" },
+    { "src": "api/status.py", "use": "@vercel/python" }
   ],
   "routes": [
-    {
-      "src": "/api/webhook",
-      "dest": "api/webhook.py"
-    },
-    {
-      "src": "/api/register",
-      "dest": "api/register.py"
-    }
+    { "src": "/api/webhook", "dest": "api/webhook.py" },
+    { "src": "/api/register", "dest": "api/register.py" },
+    { "src": "/api/status", "dest": "api/status.py" }
   ]
 }
