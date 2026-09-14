@@ -13,17 +13,17 @@ API_BASE = 'https://platform-api2.max.ru'
 # ⚙️ НАСТРОЙКИ — РЕДАКТИРУЙТЕ ЗДЕСЬ
 # =====================================================
 
-# Официальная форма регистрации туристских групп МЧС
+# Форма МЧС России для регистрации туристских групп
 REGISTRATION_URL = "https://forms.mchs.gov.ru/registration_tourist_groups"
 
-# Прямая ссылка на герб (вставьте ВАШУ ссылку из шага 1!)
+# Официальный бот РСЧС Сахалинской области с предупреждениями
+RSCHS_URL = "https://max.ru/id6501156338_gos"
+
+# Прямая ссылка на герб для приветствия
 START_IMAGE_URL = "https://raw.githubusercontent.com/mariadmitrieva66-hue/max-bot/main/emblem.png"
 
-# Актуальный текст предупреждений (меняйте при новых штормовых)
-WARNINGS_TEXT = ("**⚠️ ВНИМАНИЕ!**\n\n"
-                 "По данным Сахалинского УГМС: сегодня в регионе ожидается "
-                 "усиление ветра до 20 м/с.\n"
-                 "Соблюдайте осторожность!")
+# Токен герба (заполните, если перейдёте на /api/upload); пока пусто — работает по ссылке
+START_IMAGE_TOKEN = ""
 # =====================================================
 
 
@@ -37,8 +37,11 @@ def send_message(chat_id, text, buttons=None, image_url=None):
     def build_payload(with_image):
         payload = {'text': text, 'format': 'markdown'}
         attachments = []
-        if with_image and image_url:
-            attachments.append({'type': 'image', 'payload': {'url': image_url}})
+        if with_image:
+            if START_IMAGE_TOKEN:
+                attachments.append({'type': 'image', 'payload': {'token': START_IMAGE_TOKEN}})
+            elif image_url:
+                attachments.append({'type': 'image', 'payload': {'url': image_url}})
         if buttons:
             attachments.append({'type': 'inline_keyboard', 'payload': {'buttons': buttons}})
         if attachments:
@@ -48,14 +51,13 @@ def send_message(chat_id, text, buttons=None, image_url=None):
     response = requests.post(url, headers=headers, json=build_payload(True), timeout=10, verify=False)
     print(f"📤 ОТВЕТ MAX API: {response.status_code} | {response.text}")
 
-    # Если MAX не смог скачать картинку — отправляем то же сообщение без неё
     if response.status_code == 400 and 'image' in response.text.lower():
         print("⚠️ Картинка не загрузилась, повторяю отправку БЕЗ картинки")
         response = requests.post(url, headers=headers, json=build_payload(False), timeout=10, verify=False)
         print(f"📤 ОТВЕТ MAX API (без картинки): {response.status_code} | {response.text}")
     return response
 
-# --- КОНСТРУКТОРЫ КНОПОК ---
+
 def btn(text, payload):
     """Кнопка внутри бота (callback)"""
     return {"type": "callback", "text": text, "payload": payload}
@@ -69,11 +71,10 @@ def btn_contact(text):
     return {"type": "request_contact", "text": text}
 
 
-# --- МЕНЮ ---
 def main_menu():
     return [
         [btn("🔥 Что делать при ЧС", "emergency_menu")],
-        [btn("⚠️ Предупреждения", "warnings")],
+        [btn_link("⚠️ Предупреждения (РСЧС)", RSCHS_URL)],
         [btn("📞 Контакты", "contacts")],
         [btn_link("📝 Регистрация туристских групп", REGISTRATION_URL)]
     ]
@@ -96,7 +97,6 @@ def back_menu():
     return [[btn("🏠 Главное меню", "main")]]
 
 
-# --- ЛОГИКА ОТВЕТОВ ---
 def handle_command(chat_id, command):
     command = str(command).strip().lower()
 
@@ -109,11 +109,11 @@ def handle_command(chat_id, command):
             "• Выберите раздел через кнопки меню ниже\n"
             "• Или просто введите ключевые слова: `пожар`, `спасатели`, "
             "`градусник`, `огнетушитель`, `наводнение`, `цунами`, `землетрясение` "
-            "— и мгновенно получите информацию, как действовать при ЧС\n\n"
+            "— и мгновенно получите информацию, как действовать\n\n"
             "Для начала работы нажмите кнопку ниже или введите нужное слово:",
             main_menu(),
             image_url=START_IMAGE_URL)
-      
+
     elif command in ['emergency_menu', 'что делать при чс', '/emergency_menu']:
         send_message(chat_id,
             "**⚠️ ТЕСТОВЫЙ РЕЖИМ**\nЕсли есть угроза жизни — звоните `112`!",
@@ -128,7 +128,23 @@ def handle_command(chat_id, command):
             "• Выведите людей из помещения",
             back_menu())
 
-      elif command in ['спасатели', '/спасатели']:
+    elif command in ['flood', 'наводнение', 'цунами', '/flood']:
+        send_message(chat_id,
+            "**🌊 НАВОДНЕНИЕ / ЦУНАМИ: что делать**\n\n"
+            "⚠️ При сигнале цунами **немедленно уходите от берега!**\n"
+            "• Поднимитесь на возвышенность\n"
+            "• Не возвращайтесь до отбоя тревоги",
+            back_menu())
+
+    elif command in ['earthquake', 'землетрясение', '/earthquake']:
+        send_message(chat_id,
+            "**🏠 ЗЕМЛЕТРЯСЕНИЕ: что делать**\n\n"
+            "✅ **ВО ВРЕМЯ ТОЛЧКОВ:**\n"
+            "• В здании: встаньте в дверной проём или под прочный стол\n"
+            "• Держитесь подальше от окон и шкафов",
+            back_menu())
+
+    elif command in ['спасатели', '/спасатели']:
         send_message(chat_id,
             "**🚒 СПАСАТЕЛИ: когда и как вызывать**\n\n"
             "✅ **Звоните немедленно:**\n"
@@ -168,25 +184,17 @@ def handle_command(chat_id, command):
             "• Не направляйте на людей\n"
             "• После использования — замените!",
             back_menu())
-  
-    elif command in ['flood', 'наводнение', 'цунами', '/flood']:
-        send_message(chat_id,
-            "**🌊 НАВОДНЕНИЕ / ЦУНАМИ: что делать**\n\n"
-            "⚠️ При сигнале цунами **немедленно уходите от берега!**\n"
-            "• Поднимитесь на возвышенность\n"
-            "• Не возвращайтесь до отбоя тревоги",
-            back_menu())
-
-    elif command in ['earthquake', 'землетрясение', '/earthquake']:
-        send_message(chat_id,
-            "**🏠 ЗЕМЛЕТРЯСЕНИЕ: что делать**\n\n"
-            "✅ **ВО ВРЕМЯ ТОЛЧКОВ:**\n"
-            "• В здании: встаньте в дверной проём или под прочный стол\n"
-            "• Держитесь подальше от окон и шкафов",
-            back_menu())
 
     elif command in ['warnings', 'предупреждения', '/warnings']:
-        send_message(chat_id, WARNINGS_TEXT, back_menu())
+        send_message(chat_id,
+            "**⚠️ ПРЕДУПРЕЖДЕНИЯ**\n\n"
+            "Официальные штормовые предупреждения и оперативная информация "
+            "публикуются в боте РСЧС Сахалинской области.\n\n"
+            "Нажмите кнопку ниже, чтобы перейти к первоисточнику:",
+            [
+                [btn_link("🌐 Открыть бот РСЧС Сахалинской области", RSCHS_URL)],
+                [btn("🏠 Главное меню", "main")]
+            ])
 
     elif command in ['contacts', 'контакты', '/contacts']:
         send_message(chat_id,
@@ -200,14 +208,13 @@ def handle_command(chat_id, command):
 
     elif command in ['registration', 'регистрация туристских групп', '/registration']:
         send_message(chat_id,
-            "📝 Регистрация туристских групп осуществляется на сайте Агентства:",
+            "📝 Регистрация туристских групп осуществляется на портале МЧС России:",
             [[btn_link("Перейти к регистрации", REGISTRATION_URL)]])
 
     else:
-        send_message(chat_id, "Я вас не понял. Используйте кнопки меню:", main_menu())
+        send_message(chat_id, "Я вас не понял. Используйте кнопки меню или ключевые слова:", main_menu())
 
 
-# --- ОБРАБОТЧИК WEBHOOK ---
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
         content_length = int(self.headers.get('Content-Length', 0))
@@ -223,12 +230,18 @@ class handler(BaseHTTPRequestHandler):
             print(f"📨 Получено: {update_type} | chat_id={chat_id}")
 
             if update_type == 'bot_started':
-                handle_command(chat_id, '/start')
+                payload = data.get('payload')
+                if payload == 'reg_tour':
+                    send_message(chat_id,
+                        "**📝 Регистрация туристских групп**\n\n"
+                        "Для выхода на маршрут необходимо зарегистрировать "
+                        "группу на портале МЧС России:",
+                        [[btn_link("Перейти к регистрации", REGISTRATION_URL)]])
+                else:
+                    handle_command(chat_id, '/start')
 
             elif update_type == 'message_created':
                 attachments = message.get('attachments', [])
-
-                # Пользователь поделился контактом
                 if any(a.get('type') == 'contact' for a in attachments):
                     send_message(chat_id,
                         "**✅ Спасибо!** Ваш контакт получен.\n"
