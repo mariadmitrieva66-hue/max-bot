@@ -310,12 +310,11 @@ def handle_command(chat_id, command):
             "`градусник`, `огнетушитель`, `наводнение`, `цунами`, `землетрясение`, "
             "`еддс`, `погода` — и мгновенно получите информацию.\n\n"
             "Для начала работы нажмите кнопку ниже или введите нужное слово:",
-            main_menu(),
-            image_url=START_IMAGE_URL)
+            main_menu())
 
     elif command in ['emergency_menu', 'что делать при чс', '/emergency_menu']:
         send_message(chat_id,
-            "**⚠️ ТЕСТОВЫЙ РЕЖИМ**\nЕсли есть угроза жизни — звоните `112`!",
+            "\nВыберите тип ЧС:",
             emergency_menu())
 
     elif command in ['fire', 'пожар', '/fire']:
