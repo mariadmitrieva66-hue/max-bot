@@ -89,6 +89,7 @@ def main_menu():
         [btn("🚨 ЕДДС", 'edds')],
         [btn_link("⚠️ Предупреждения (РСЧС)", RSCHS_URL)],
         [btn("🏔️ Погода на маршрутах", 'routes')],
+        [btn("📋 Чек-листы", 'checklists')],
         [btn_link("📝 Регистрация туристских групп", REGISTRATION_URL)],
         [btn("📞 Контакты", 'contacts')],
     ]
@@ -123,6 +124,7 @@ COMMAND_WORDS = [
     'главное меню', 'main',
     'погода', 'маршруты',
     'привет', 'здравствуй', 'здравствуйте', 'добрый день', 'hello', 'hi',
+    'чек-лист', 'чек-листы', 'списки', 'checklist',
 ]
 
 
@@ -294,11 +296,148 @@ def routes_list_menu(cat):
     menu.append([btn("🏠 Главное меню", 'main')])
     return menu
 
+# =====================================================
+# 📋 ЧЕК-ЛИСТЫ
+# =====================================================
+CHECKLISTS = {
+    'forest': {
+        'title': '🌲 Поход в лес',
+        'items': [
+            'Сообщил родным, куда и когда вернусь',
+            'Заряженный телефон + пауэрбанк',
+            'Спички/зажигалка в влагозащите',
+            'Запас воды и перекус',
+            'Нож, компас или офлайн-карты',
+            'Яркая одежда, головной убор, репеллент',
+            'Аптечка',
+            'Свисток для сигнала',
+            'Посмотрел прогноз погоды на день',
+        ],
+    },
+    'fish_winter': {
+        'title': '🧊 Зимняя рыбалка',
+        'items': [
+            'Уточнил сводку по льду (безопасно от 10 см)',
+            'Сообщил родным место и время возврата',
+            'Термоодеяло',
+            'Верёвка 15-20 м',
+            'Телефон заряжен, во внутреннем кармане',
+            'Тёплая одежда, запасные перчатки',
+            'Термос с горячим питьём',
+            'Без алкоголя!',
+            'Телефон ЕДДС округа — в разделе «ЕДДС»',
+        ],
+    },
+    'fish_summer': {
+        'title': '🎣 Летняя рыбалка',
+        'items': [
+            'Сообщил родным маршрут и время возврата',
+            'Спасательный жилет',
+            'Телефон в водозащитном чехле',
+            'Вода, головной убор, солнцезащита',
+            'Защита от клещей',
+            'Аптечка',
+            'Проверил прогноз погоды и ветра',
+            'Для лодки: запас топлива и вёсла',
+            'Знаю точки съезда к берегу и телефон ЕДДС',
+        ],
+    },
+    'car': {
+        'title': '🚗 Поездка на машине',
+        'items': [
+            'Полный бак + запас топлива',
+            'Запаска, домкрат, насос',
+            'Зарядка для телефона в машине',
+            'Вода, перекус, тёплый плед',
+            'Аптечка, знак аварийной остановки, жилет',
+            'Трос, провода для прикуривания',
+            'Офлайн-карты в телефоне',
+            'Сообщил родным маршрут и время прибытия',
+            'Зимой: лопата, скребок, песок',
+        ],
+    },
+    'gobag': {
+        'title': '🎒 Тревожный чемоданчик',
+        'items': [
+            'Документы в водонепроницаемом пакете',
+            'Вода 2-3 л на человека',
+            'Продукты на 3 дня без холодильника',
+            'Аптечка и личные лекарства',
+            'Фонарик + запасные батарейки',
+            'Пауэрбанк, радиоприёмник',
+            'Тёплые вещи, дождевик',
+            'Наличные (карты могут не работать)',
+            'Запасные ключи, свисток, маска',
+        ],
+    },
+    'storm': {
+        'title': '🌪️ Дом перед циклоном',
+        'items': [
+            'Закрепил окна, убрал вещи с балкона и двора',
+            'Запас воды и еды на 2-3 дня',
+            'Зарядил телефоны и пауэрбанки',
+            'Фонарики (свечи — с осторожностью)',
+            'Перекрыл газ, набрал техводу в ванну',
+            'Собрал тревожный чемоданчик (см. чек-лист)',
+            'Машину — подальше от деревьев и щитов',
+            'Телефоны ЕДДС и 112 — под рукой',
+        ],
+    },
+}
+
+
+def checklists_menu():
+    menu = [[btn(cl['title'], f'check_show|{key}')] for key, cl in CHECKLISTS.items()]
+    menu.append([btn("🏠 Главное меню", 'main')])
+    return menu
+
+
+def render_checklist(key, mask):
+    cl = CHECKLISTS.get(key)
+    if not cl:
+        return None, None
+    lines = []
+    buttons = []
+    done = 0
+    for i, item in enumerate(cl['items']):
+        checked = i < len(mask) and mask[i] == '1'
+        if checked:
+            done += 1
+        sym = '✅' if checked else '⬜'
+        lines.append(f"{sym} {item}")
+        buttons.append([btn(f"{sym} {item}", f'check_toggle|{key}|{i}|{mask}')])
+    total = len(cl['items'])
+    text = (f"**📋 {cl['title']}**\nНажимайте на пункты, которые выполнили:\n\n"
+            + "\n".join(lines)
+            + f"\n\n**Готовность: {done} из {total}**")
+    if done == total:
+        text += "\n\n🏅 **Отлично! Вы полностью готовы.** Хорошей дороги и берегите себя!"
+    buttons.append([btn("🔄 Начать заново", f'check_reset|{key}'),
+                    btn("⬅️ Чек-листы", 'checklists')])
+    return text, buttons
+
+
+def send_or_edit(chat_id, message_id, text, buttons=None):
+    """Обновляет сообщение на месте, если есть его ID; иначе шлёт новое"""
+    if message_id:
+        payload = {'text': text, 'format': 'markdown'}
+        if buttons:
+            payload['attachments'] = [{'type': 'inline_keyboard', 'payload': {'buttons': buttons}}]
+        try:
+            r = requests.put(f'{API_BASE}/messages/{message_id}',
+                             headers={'Authorization': MAX_TOKEN, 'Content-Type': 'application/json'},
+                             json=payload, timeout=10, verify=False)
+            print(f'✏️ Редактирование сообщения: {r.status_code}')
+            if r.status_code == 200:
+                return r
+        except Exception as e:
+            print(f'⚠️ Редактирование не удалось: {e}')
+    return send_message(chat_id, text, buttons)
 
 # =====================================================
 # ЛОГИКА ОТВЕТОВ
 # =====================================================
-def handle_command(chat_id, command):
+def handle_command(chat_id, command, message_id=None):
     command = str(command).strip().lower()
 
     if command in ('start', 'main', '/start', 'главное меню', 'привет', 'здравствуй', 'здравствуйте', 'добрый день', 'hello', 'hi'):
@@ -473,6 +612,38 @@ def handle_command(chat_id, command):
                 "Попробуйте через пару минут.",
                 routes_cat_menu())
 
+    elif command in ['checklists', 'чек-лист', 'чек-листы', 'списки', '/checklist']:
+        send_message(chat_id,
+            "**📋 ЧЕК-ЛИСТЫ**\n\n"
+            "Выберите ситуацию — бот покажет список. "
+            "Нажимайте на пункты, чтобы отмечать выполненное:",
+            checklists_menu())
+
+    elif command.startswith('check_show|'):
+        key = command.split('|')[1]
+        cl = CHECKLISTS.get(key)
+        if cl:
+            text, buttons = render_checklist(key, '0' * len(cl['items']))
+            send_message(chat_id, text, buttons)
+
+    elif command.startswith('check_toggle|'):
+        try:
+            parts = command.split('|')
+            key, idx, mask = parts[1], int(parts[2]), list(parts[3])
+            if 0 <= idx < len(mask):
+                mask[idx] = '0' if mask[idx] == '1' else '1'
+            text, buttons = render_checklist(key, ''.join(mask))
+            send_or_edit(chat_id, message_id, text, buttons)
+        except Exception as e:
+            print(f'❌ Чек-лист ошибка: {e}')
+
+    elif command.startswith('check_reset|'):
+        key = command.split('|')[1]
+        cl = CHECKLISTS.get(key)
+        if cl:
+            text, buttons = render_checklist(key, '0' * len(cl['items']))
+            send_or_edit(chat_id, message_id, text, buttons)
+    
     else:
         send_message(chat_id, "Я вас не понял. Используйте кнопки меню или ключевые слова:", main_menu())
 
@@ -515,7 +686,8 @@ class handler(BaseHTTPRequestHandler):
                 callback = data.get('callback', {})
                 payload = callback.get('payload') or data.get('payload')
                 if payload:
-                    handle_command(chat_id, payload)
+                mid = callback.get('messageId') or (callback.get('message') or {}).get('messageId')
+                handle_command(chat_id, payload, message_id=mid)
 
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
