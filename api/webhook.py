@@ -42,6 +42,79 @@ EDDS_BODY = ("**Александровск-Сахалинский МО:** [8 (42
 # =====================================================
 # ОТПРАВКА СООБЩЕНИЙ
 # =====================================================
+
+# =====================================================
+# 📊 СТАТИСТИКА
+# =====================================================
+def stats_track(chat_id, event_type, command=None):
+    """Сохраняет событие пользователя в базу"""
+    base = os.getenv('UPSTASH_REDIS_REST_URL')
+    token = os.getenv('UPSTASH_REDIS_REST_TOKEN')
+    if not base or not token:
+        return  # база не настроена, пропускаем
+    
+    headers = {'Authorization': f'Bearer {token}'}
+    today = time.strftime('%Y-%m-%d')
+    
+    try:
+        # Увеличиваем счётчик событий
+        requests.post(f'{base}/incr/stats:total:{today}', headers=headers, timeout=5)
+        
+        # Добавляем пользователя в множество (уникальные)
+        requests.post(f'{base}/sadd/stats:users:{today}', headers=headers, 
+                      json=[chat_id], timeout=5)
+        
+        # Считаем команды
+        if command:
+            requests.post(f'{base}/incr/stats:cmd:{command}:{today}', headers=headers, timeout=5)
+        
+        # Последняя активность пользователя
+        requests.post(f'{base}/set/user:{chat_id}:last', headers=headers,
+                      json=[time.strftime('%Y-%m-%d %H:%M:%S')], timeout=5)
+                      
+    except Exception as e:
+        print(f'⚠️ Stats error: {e}')
+
+
+def stats_get_summary():
+    """Возвращает сводку статистики"""
+    base = os.getenv('UPSTASH_REDIS_REST_URL')
+    token = os.getenv('UPSTASH_REDIS_REST_TOKEN')
+    if not base or not token:
+        return "База статистики не настроена"
+    
+    headers = {'Authorization': f'Bearer {token}'}
+    today = time.strftime('%Y-%m-%d')
+    
+    try:
+        # Всего событий сегодня
+        total_r = requests.get(f'{base}/get/stats:total:{today}', headers=headers, timeout=5).json()
+        total_today = int(total_r.get('result', 0))
+        
+        # Уникальных пользователей сегодня
+        users_r = requests.get(f'{base}/scard/stats:users:{today}', headers=headers, timeout=5).json()
+        users_today = int(users_r.get('result', 0))
+        
+        # Топ-5 команд сегодня
+        top_cmds = {}
+        for cmd in ['fire', 'flood', 'earthquake', 'edds', 'routes', 'checklists']:
+            cmd_r = requests.get(f'{base}/get/stats:cmd:{cmd}:{today}', headers=headers, timeout=5).json()
+            count = int(cmd_r.get('result', 0))
+            if count > 0:
+                top_cmds[cmd] = count
+        
+        top_sorted = sorted(top_cmds.items(), key=lambda x: x[1], reverse=True)[:5]
+        top_text = '\n'.join([f"• `{cmd}` — {count}" for cmd, count in top_sorted]) or 'Пока нет данных'
+        
+        return (f"**📊 СТАТИСТИКА**\n\n"
+                f"**За сегодня ({today}):**\n"
+                f"• Всего сообщений: **{total_today}**\n"
+                f"• Уникальных пользователей: **{users_today}**\n\n"
+                f"**Топ-5 команд сегодня:**\n{top_text}")
+                
+    except Exception as e:
+        return f"Ошибка при получении статистики: {e}"
+
 def send_message(chat_id, text, buttons=None, image_url=None):
     if not chat_id:
         print("⚠️ chat_id пустой, пропускаю отправку")
@@ -443,6 +516,11 @@ def send_or_edit(chat_id, message_id, text, buttons=None):
 # =====================================================
 def handle_command(chat_id, command, message_id=None):
     command = str(command).strip().lower()
+    # Команда статистики (только для админа)
+    ADMIN_CHAT_IDS = ['111486830']  # ВАШ chat_id
+    if command in ['/stats', 'статистика', 'stats'] and str(chat_id) in ADMIN_CHAT_IDS:
+        send_message(chat_id, stats_get_summary(), back_menu())
+        return
 
     if command in ('start', 'main', '/start', 'главное меню', 'привет', 'здравствуй', 'здравствуйте', 'добрый день', 'hello', 'hi'):
         send_message(chat_id,
@@ -680,13 +758,22 @@ class handler(BaseHTTPRequestHandler):
                 body = message.get('body', {})
                 text = body.get('text', '') if isinstance(body, dict) else str(body)
                 matched = fuzzy_command(text)
-                handle_command(chat_id, matched if matched else text)
+                cmd = matched if matched else text
+                
+                # Трекаем событие
+                stats_track(chat_id, 'message', cmd)
+                
+                handle_command(chat_id, cmd)
 
             elif update_type == 'message_callback':
                 callback = data.get('callback', {})
                 payload = callback.get('payload') or data.get('payload')
                 if payload:
                     mid = callback.get('messageId') or (callback.get('message') or {}).get('messageId')
+                    
+                    # Трекаем нажатие кнопки
+                    stats_track(chat_id, 'button', payload)
+                    
                     handle_command(chat_id, payload, message_id=mid)
 
             self.send_response(200)
