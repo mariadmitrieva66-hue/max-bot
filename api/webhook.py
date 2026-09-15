@@ -88,19 +88,19 @@ def stats_get_summary():
     today = time.strftime('%Y-%m-%d')
     
     try:
-        # Всего событий сегодня
+        # Всего событий сегодня (если нет данных, or 0 вернёт 0 вместо None)
         total_r = requests.get(f'{base}/get/stats:total:{today}', headers=headers, timeout=5).json()
-        total_today = int(total_r.get('result', 0))
+        total_today = int(total_r.get('result') or 0)
         
         # Уникальных пользователей сегодня
         users_r = requests.get(f'{base}/scard/stats:users:{today}', headers=headers, timeout=5).json()
-        users_today = int(users_r.get('result', 0))
+        users_today = int(users_r.get('result') or 0)
         
         # Топ-5 команд сегодня
         top_cmds = {}
         for cmd in ['fire', 'flood', 'earthquake', 'edds', 'routes', 'checklists']:
             cmd_r = requests.get(f'{base}/get/stats:cmd:{cmd}:{today}', headers=headers, timeout=5).json()
-            count = int(cmd_r.get('result', 0))
+            count = int(cmd_r.get('result') or 0)
             if count > 0:
                 top_cmds[cmd] = count
         
