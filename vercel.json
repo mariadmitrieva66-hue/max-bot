@@ -4,10 +4,12 @@
     { "src": "api/webhook.py", "use": "@vercel/python" },
     { "src": "api/register.py", "use": "@vercel/python" },
     { "src": "api/setup.py", "use": "@vercel/python" }
+    {"src": "api/stats.py", "use": "@vercel/python"}
   ],
   "routes": [
     { "src": "/api/webhook", "dest": "api/webhook.py" },
     { "src": "/api/register", "dest": "api/register.py" },
     { "src": "/api/setup", "dest": "api/setup.py" }
+    {"src": "/api/stats", "dest": "api/stats.py"}
   ]
 }
