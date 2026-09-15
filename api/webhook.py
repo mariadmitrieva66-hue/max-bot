@@ -86,11 +86,11 @@ def btn_link(text, url):
 def main_menu():
     return [
         [btn("🔥 Что делать при ЧС", 'emergency_menu')],
-        [btn_link("⚠️ Предупреждения (РСЧС)", RSCHS_URL)],
-        [btn("📞 Контакты", 'contacts')],
         [btn("🚨 ЕДДС", 'edds')],
-        [btn_link("📝 Регистрация туристских групп", REGISTRATION_URL)],
+        [btn_link("⚠️ Предупреждения (РСЧС)", RSCHS_URL)],
         [btn("🏔️ Погода на маршрутах", 'routes')],
+        [btn_link("📝 Регистрация туристских групп", REGISTRATION_URL)],
+        [btn("📞 Контакты", 'contacts')],
     ]
 
 def emergency_menu():
