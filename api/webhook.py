@@ -73,6 +73,7 @@ def main_menu():
         [btn("🔥 Что делать при ЧС", "emergency_menu")],
         [btn_link("⚠️ Предупреждения (РСЧС)", RSCHS_URL)],
         [btn("🚨 ЕДДС", "edds")],
+        [btn("🏔️ Погода на маршрутах", 'routes')],
         [btn_link("📝 Регистрация туристских групп", REGISTRATION_URL)],
         [btn("📞 Контакты", "contacts")]
     ]
@@ -139,6 +140,118 @@ def fuzzy_command(text):
         return best_word
 
     return None
+
+# =====================================================
+# 🏔️ ТУРИСТИЧЕСКИЕ ТОЧКИ САХАЛИНСКОЙ ОБЛАСТИ
+# =====================================================
+ROUTE_CATS = {
+    'mountains': '⛰️ Горы и хребты',
+    'coast': '🌊 Побережье и бухты',
+    'kurily': '🌋 Курильские острова',
+}
+
+ROUTES = {
+    'chekhov': {'name': 'Пик Чехова', 'cat': 'mountains', 'lat': 47.0053, 'lon': 142.8403,
+                'info': '1045 м, Сусунайский хребет, подъём от «Горного воздуха»'},
+    'lyagushka': {'name': 'Скала Лягушка (Весточка)', 'cat': 'mountains', 'lat': 46.8689, 'lon': 142.8888,
+                  'info': 'смотровые площадки с видом на Охотское море'},
+    'zdanko': {'name': 'Хребет Жданко', 'cat': 'mountains', 'lat': 48.2496, 'lon': 142.5845,
+               'info': 'лавовый хребет 13 км, Макаровский округ'},
+    'velikan': {'name': 'Мыс Великан', 'cat': 'coast', 'lat': 46.6256, 'lon': 143.5145,
+                'info': 'скальные арки и кекуры, Корсаковский округ'},
+    'aniva': {'name': 'Маяк Анива', 'cat': 'coast', 'lat': 46.0193, 'lon': 143.4141,
+              'info': 'заброшенный маяк на скале Сивучья, стык двух морей'},
+    'busse': {'name': 'Озеро Буссе', 'cat': 'coast', 'lat': 46.5383, 'lon': 143.3331,
+              'info': 'тёплая лагуна с устрицами и гребешком'},
+    'tihaya': {'name': 'Бухта Тихая', 'cat': 'coast', 'lat': 48.0425, 'lon': 142.5428,
+               'info': 'живописная бухта залива Терпения, восточное побережье'},
+    'kudryavy': {'name': 'Вулкан Кудрявый (Итуруп)', 'cat': 'kurily', 'lat': 45.3839, 'lon': 148.8131,
+                 'info': 'действующий вулкан, единственное в мире месторождение рения'},
+}
+
+
+def day_verdict(gusts, precip, t_min):
+    """Вердикт по одному дню: эмодзи-светофор"""
+    if gusts >= 18 or precip >= 80 or t_min <= -18:
+        return '❌'
+    if gusts >= 12 or precip >= 50 or t_min <= -10:
+        return '⚠️'
+    return '✅'
+
+
+def verdict_text(gusts, precip, t_min):
+    v = day_verdict(gusts, precip, t_min)
+    if v == '❌':
+        return v + ' **ОПАСНО:** сильный ветер / непогода. Выход на маршрут лучше перенести.'
+    if v == '⚠️':
+        return v + ' **С ОСТОРОЖНОСТЬЮ:** условия пограничные. Тёплая одежда, снаряжение, сообщите родным маршрут.'
+    return v + ' **Условия благоприятные.** Не забудьте воду, заряженный телефон и регистрацию группы.'
+
+
+def fetch_route_weather(route_key):
+    """Прогноз Open-Meteo на 3 дня по координатам точки"""
+    route = ROUTES.get(route_key)
+    if not route:
+        return None
+    params = {
+        'latitude': route['lat'],
+        'longitude': route['lon'],
+        'current': 'temperature_2m,wind_speed_10m,wind_gusts_10m',
+        'daily': 'temperature_2m_max,temperature_2m_min,'
+                 'precipitation_probability_max,wind_gusts_10m_max',
+        'forecast_days': 3,
+        'timezone': 'auto',
+    }
+    try:
+        r = requests.get('https://api.open-meteo.com/v1/forecast', params=params, timeout=10)
+        if r.status_code != 200:
+            print(f'⚠️ Open-Meteo: статус {r.status_code}')
+            return None
+        data = r.json()
+    except Exception as e:
+        print(f'⚠️ Open-Meteo ошибка: {e}')
+        return None
+
+    cur = data.get('current', {}) or {}
+    daily = data.get('daily', {}) or {}
+    days = daily.get('time', [])
+    labels = ['Сегодня', 'Завтра', 'Послезавтра']
+    lines = []
+    for i in range(min(3, len(days))):
+        t_min = (daily.get('temperature_2m_min') or [None] * 3)[i]
+        t_max = (daily.get('temperature_2m_max') or [None] * 3)[i]
+        precip = (daily.get('precipitation_probability_max') or [None] * 3)[i] or 0
+        gust = (daily.get('wind_gusts_10m_max') or [None] * 3)[i] or 0
+        emoji = day_verdict(gust, precip, t_min or 0)
+        lines.append(f"{emoji} **{labels[i]}:** {t_min}…{t_max}°C, "
+                     f"осадки {precip}%, порывы до {gust} м/с")
+
+    today_gust = (daily.get('wind_gusts_10m_max') or [None])[0] or cur.get('wind_gusts_10m') or 0
+    today_precip = (daily.get('precipitation_probability_max') or [None])[0] or 0
+    today_tmin = (daily.get('temperature_2m_min') or [None])[0] or 0
+
+    return (f"**🏔️ {route['name']}**\n_{route['info']}_\n\n"
+            f"**Сейчас:** {cur.get('temperature_2m')}°C, "
+            f"ветер {cur.get('wind_speed_10m')} м/с (порывы {cur.get('wind_gusts_10m')})\n\n"
+            "**Прогноз на 3 дня:**\n" + "\n".join(lines) + "\n\n"
+            f"**Вердикт на сегодня:** {verdict_text(today_gust, today_precip, today_tmin)}\n"
+            f"_данные Open-Meteo, высота точки ≈ {data.get('elevation')} м_")
+
+
+def routes_cat_menu():
+    menu = [[btn(label, f'routes_cat|{key}')] for key, label in ROUTE_CATS.items()]
+    menu.append([btn("🏠 Главное меню", 'main')])
+    return menu
+
+
+def routes_list_menu(cat):
+    menu = []
+    for key, route in ROUTES.items():
+        if route['cat'] == cat:
+            menu.append([btn(f"📍 {route['name']}", f'route_{key}')])
+    menu.append([btn("⬅️ К категориям", 'routes')])
+    menu.append([btn("🏠 Главное меню", 'main')])
+    return menu
 
 def handle_command(chat_id, command):
     command = str(command).strip().lower()
@@ -311,6 +424,31 @@ def handle_command(chat_id, command):
             "📝 Регистрация туристских групп осуществляется на портале МЧС России:",
             [[btn_link("Перейти к регистрации", REGISTRATION_URL)]])
 
+    elif command in ['routes', 'погода', 'маршруты', '/routes']:
+        send_message(chat_id,
+            "**🏔️ ПОГОДА НА ТУРИСТИЧЕСКИХ ТОЧКАХ**\n\n"
+            "Выберите категорию — бот покажет прогноз на 3 дня "
+            "и вердикт о безопасности по каждому дню:",
+            routes_cat_menu())
+
+    elif command.startswith('routes_cat|'):
+        cat = command.split('|')[1]
+        send_message(chat_id,
+            f"**{ROUTE_CATS.get(cat, 'Точки')}**\nВыберите точку:",
+            routes_list_menu(cat))
+
+    elif command.startswith('route_'):
+        key = command[len('route_'):]
+        text = fetch_route_weather(key)
+        if text:
+            cat = ROUTES.get(key, {}).get('cat', 'mountains')
+            send_message(chat_id, text, routes_list_menu(cat))
+        else:
+            send_message(chat_id,
+                "⚠️ Не удалось получить погоду сейчас. "
+                "Попробуйте через пару минут.",
+                routes_cat_menu())
+    
     else:
         send_message(chat_id, "Я вас не понял. Используйте кнопки меню или ключевые слова:", main_menu())
 
