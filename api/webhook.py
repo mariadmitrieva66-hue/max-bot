@@ -1073,7 +1073,7 @@ def handle_command(chat_id, command, message_id=None):
             "• практические занятия с выездом в лес.\n\n"
             "По окончании — **сертификат**. Курсы проводятся при наборе группы.\n\n"
             "📞 **Запись:** [(4242) 796-645](tel:+74242796645)\n"
-            "📧 **Email:** [mchs.trcenter@sakhalin.gov.ru](mailto:mchs.trcenter@sakhalin.gov.ru)\n"
+            "📧 **Email:** [mchs.trcenter@sakhalin.gov.ru](mailto:mchs.trcenter@sakhalin.gov.ru)\n\n"
             "_Станьте тем, кто возвращает людей домой._",
             back_menu())
     
