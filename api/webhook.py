@@ -1,4 +1,5 @@
 import json
+import difflib
 import os
 import requests
 import urllib3
@@ -86,6 +87,58 @@ def emergency_menu():
 def back_menu():
     return [[btn("🏠 Главное меню", "main")]]
 
+# Все слова-команды, которые понимает бот (для нечёткого поиска)
+COMMAND_WORDS = [
+    'пожар', 'fire',
+    'наводнение', 'цунами', 'flood', 'tsunami',
+    'землетрясение', 'earthquake',
+    'спасатели',
+    'градусник', 'ртуть',
+    'огнетушитель',
+    'предупреждения', 'warnings',
+    'контакты', 'contacts',
+    'еддс', 'edds',
+    'регистрация туристских групп', 'registration',
+    'что делать при чс',
+    'главное меню', 'main',
+]
+
+
+def _norm(s):
+    """Убирает пробелы, регистр и пунктуацию по краям"""
+    return str(s).strip().lower().strip('.,!?;:()«»"\' ')
+
+def fuzzy_command(text):
+    """Понимает опечатки и формы слов: возвращает команду или None"""
+    low = _norm(text)
+    if not low:
+        return None
+
+    # Уровень 1: точное совпадение
+    if low in COMMAND_WORDS:
+        return low
+
+    # Уровень 2: команда встречается внутри фразы
+    for w in COMMAND_WORDS:
+        if len(w) >= 4 and w in low:
+            return w
+
+    # Уровень 3: нечёткий поиск — опечатки и формы слов
+    candidates = [low] + [c for c in low.split() if len(c) >= 4]
+    best_word, best_ratio = None, 0.0
+    for cand in candidates:
+        for w in COMMAND_WORDS:
+            if len(w) < 4:
+                continue
+            ratio = difflib.SequenceMatcher(None, cand, w).ratio()
+            if ratio > best_ratio:
+                best_ratio, best_word = ratio, w
+
+    if best_ratio >= 0.75:
+        print(f"🔮 Нечёткое совпадение: '{text}' -> '{best_word}' (уверенность {best_ratio:.2f})")
+        return best_word
+
+    return None
 
 def handle_command(chat_id, command):
     command = str(command).strip().lower()
@@ -290,7 +343,8 @@ class handler(BaseHTTPRequestHandler):
             elif update_type == 'message_created':
                 body = message.get('body', {})
                 text = body.get('text', '') if isinstance(body, dict) else str(body)
-                handle_command(chat_id, text)
+                matched = fuzzy_command(text)
+                handle_command(chat_id, matched if matched else text)
 
             elif update_type == 'message_callback':
                 callback = data.get('callback', {})
