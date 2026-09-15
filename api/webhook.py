@@ -1,6 +1,6 @@
 import json
-import difflib
 import os
+import difflib
 import requests
 import urllib3
 from http.server import BaseHTTPRequestHandler
@@ -13,21 +13,35 @@ API_BASE = 'https://platform-api2.max.ru'
 # =====================================================
 # ⚙️ НАСТРОЙКИ — РЕДАКТИРУЙТЕ ЗДЕСЬ
 # =====================================================
-
-# Форма МЧС России для регистрации туристских групп
 REGISTRATION_URL = "https://forms.mchs.gov.ru/registration_tourist_groups"
-
-# Официальный бот РСЧС Сахалинской области с предупреждениями
 RSCHS_URL = "https://max.ru/id6501156338_gos"
-
-# Прямая ссылка на герб для приветствия
 START_IMAGE_URL = "https://raw.githubusercontent.com/mariadmitrieva66-hue/max-bot/main/emblem.png"
-
-# Токен герба (заполните, если перейдёте на /api/upload); пока пусто — работает по ссылке
 START_IMAGE_TOKEN = ""
 # =====================================================
 
+EDDS_BODY = ("**Александровск-Сахалинский МО:** [8 (42434) 4-44-02](tel:+74243444402)\n"
+    "**Анивский МО:** [8 (42441) 4-15-17](tel:+74244141517)\n"
+    "**Долинский МО:** [8 (42442) 2-80-00](tel:+74244228000)\n"
+    "**Корсаковский МО:** [8 (42435) 4-05-67](tel:+74243540567)\n"
+    "**Курильский МО:** [8 (42454) 4-24-47](tel:+74245442447)\n"
+    "**Макаровский МО:** [8 (42443) 5-05-13](tel:+74244350513)\n"
+    "**Невельский МО:** [8 (42436) 6-09-39](tel:+74243660939)\n"
+    "**Ногликский МО:** [8 (42444) 9-71-59](tel:+74244497159)\n"
+    "**Охинский МО:** [8 (42437) 5-01-41](tel:+74243750141)\n"
+    "**Поронайский МО:** [8 (42431) 4-25-85](tel:+74243142585)\n"
+    "**Северо-Курильский МО:** [8 (42453) 2-11-54](tel:+74245321154)\n"
+    "**Смирныховский МО:** [8 (42452) 4-26-67](tel:+74245242667)\n"
+    "**Томаринский МО:** [8 (42446) 2-62-07](tel:+74244626207)\n"
+    "**Тымовский МО:** [8 (42447) 9-10-44](tel:+74244791044)\n"
+    "**Углегорский МО:** [8 (42432) 4-48-24](tel:+74243244824)\n"
+    "**Холмский МО:** [8 (42433) 2-04-06](tel:+74243320406)\n"
+    "**Южно-Курильский МО:** [8 (42455) 2-26-87](tel:+74245522687)\n"
+    "**Город Южно-Сахалинск:** [112](tel:112)")
 
+
+# =====================================================
+# ОТПРАВКА СООБЩЕНИЙ
+# =====================================================
 def send_message(chat_id, text, buttons=None, image_url=None):
     if not chat_id:
         print("⚠️ chat_id пустой, пропускаю отправку")
@@ -60,35 +74,41 @@ def send_message(chat_id, text, buttons=None, image_url=None):
 
 
 def btn(text, payload):
-    """Кнопка внутри бота (callback)"""
     return {"type": "callback", "text": text, "payload": payload}
 
 def btn_link(text, url):
-    """Кнопка-ссылка (открывает сайт в новой вкладке)"""
     return {"type": "link", "text": text, "url": url}
 
 
+# =====================================================
+# МЕНЮ
+# =====================================================
 def main_menu():
     return [
-        [btn("🔥 Что делать при ЧС", "emergency_menu")],
+        [btn("🔥 Что делать при ЧС", 'emergency_menu')],
         [btn_link("⚠️ Предупреждения (РСЧС)", RSCHS_URL)],
-        [btn("🚨 ЕДДС", "edds")],
-        [btn("🏔️ Погода на маршрутах", 'routes')],
+        [btn("📞 Контакты", 'contacts')],
+        [btn("🚨 ЕДДС", 'edds')],
         [btn_link("📝 Регистрация туристских групп", REGISTRATION_URL)],
-        [btn("📞 Контакты", "contacts")]
+        [btn("🎓 Школа безопасности", 'quiz_list')],
+        [btn("🏔️ Погода на маршрутах", 'routes')],
     ]
+
 def emergency_menu():
     return [
-        [btn("🔥 Пожар", "fire")],
-        [btn("🌊 Наводнение / Цунами", "flood")],
-        [btn("🏠 Землетрясение", "earthquake")],
-        [btn("❌ Отмена (Главное меню)", "main")]
+        [btn("🔥 Пожар", 'fire')],
+        [btn("🌊 Наводнение / Цунами", 'flood')],
+        [btn("🏠 Землетрясение", 'earthquake')],
+        [btn("❌ Отмена (Главное меню)", 'main')],
     ]
 
 def back_menu():
-    return [[btn("🏠 Главное меню", "main")]]
+    return [[btn("🏠 Главное меню", 'main')]]
 
-# Все слова-команды, которые понимает бот (для нечёткого поиска)
+
+# =====================================================
+# НЕЧЁТКИЙ ПОИСК (опечатки и формы слов)
+# =====================================================
 COMMAND_WORDS = [
     'пожар', 'fire',
     'наводнение', 'цунами', 'flood', 'tsunami',
@@ -102,29 +122,24 @@ COMMAND_WORDS = [
     'регистрация туристских групп', 'registration',
     'что делать при чс',
     'главное меню', 'main',
+    'квиз', 'квизы', 'школа', 'уроки',
+    'погода', 'маршруты',
 ]
 
 
 def _norm(s):
-    """Убирает пробелы, регистр и пунктуацию по краям"""
     return str(s).strip().lower().strip('.,!?;:()«»"\' ')
 
+
 def fuzzy_command(text):
-    """Понимает опечатки и формы слов: возвращает команду или None"""
     low = _norm(text)
     if not low:
         return None
-
-    # Уровень 1: точное совпадение
     if low in COMMAND_WORDS:
         return low
-
-    # Уровень 2: команда встречается внутри фразы
     for w in COMMAND_WORDS:
         if len(w) >= 4 and w in low:
             return w
-
-    # Уровень 3: нечёткий поиск — опечатки и формы слов
     candidates = [low] + [c for c in low.split() if len(c) >= 4]
     best_word, best_ratio = None, 0.0
     for cand in candidates:
@@ -134,12 +149,195 @@ def fuzzy_command(text):
             ratio = difflib.SequenceMatcher(None, cand, w).ratio()
             if ratio > best_ratio:
                 best_ratio, best_word = ratio, w
-
     if best_ratio >= 0.75:
         print(f"🔮 Нечёткое совпадение: '{text}' -> '{best_word}' (уверенность {best_ratio:.2f})")
         return best_word
-
     return None
+
+
+# =====================================================
+# 🎓 БАНК КВИЗОВ
+# =====================================================
+QUIZZES = {
+    'fire': {
+        'title': '🔥 Квиз «Пожар»',
+        'questions': [
+            {
+                'text': 'Вы почувствовали запах дыма на лестничной площадке. Первое действие?',
+                'options': [
+                    'Открыть дверь и посмотреть, что горит',
+                    'Позвонить 101 или 112 и предупредить соседей',
+                    'Спуститься на лифте и проверить снизу',
+                ],
+                'correct': 1,
+                'explain': 'Верно: сначала звонок и оповещение людей. Открывать дверь — дать огню кислород, лифт при пожаре смертельно опасен.',
+            },
+            {
+                'text': 'Чем НЕЛЬЗЯ тушить включённый в розетку прибор?',
+                'options': [
+                    'Порошковым огнетушителем',
+                    'Углекислотным огнетушителем',
+                    'Водой',
+                ],
+                'correct': 2,
+                'explain': 'Вода проводит ток: ударит вас и устроит замыкание. Сначала обесточить, потом тушить порошковым или углекислотным огнетушителем.',
+            },
+            {
+                'text': 'Комната наполняется дымом. Как двигаться к выходу?',
+                'options': [
+                    'В полный рост, быстро дыша',
+                    'Пригнувшись, дыша через влажную ткань',
+                    'Ждать у окна, пока дым рассеется',
+                ],
+                'correct': 1,
+                'explain': 'Дым и горячий воздух поднимаются вверх: внизу чище и прохладнее. Влажная ткань задерживает часть токсинов.',
+            },
+            {
+                'text': 'Путь к выходу отрезан огнём. Ваши действия?',
+                'options': [
+                    'Закрыться в комнате, заткнуть щели влажной тканью, подавать сигналы из окна',
+                    'Спрятаться в шкафу и переждать',
+                    'Прорываться через огонь наугад',
+                ],
+                'correct': 0,
+                'explain': 'Герметичная комната даёт время пожарным. Сигналы из окна помогают спасателям найти вас быстрее.',
+            },
+        ],
+    },
+    'earthquake': {
+        'title': '🏠 Квиз «Землетрясение»',
+        'questions': [
+            {
+                'text': 'Начались толчки, вы на 3 этаже. Что делать?',
+                'options': [
+                    'Бежать к лифту и спускаться',
+                    'Встать в дверной проём или под прочный стол',
+                    'Прыгать из окна',
+                ],
+                'correct': 1,
+                'explain': 'Во время толчков безопаснее занять защищённое место. Лифт может встать, прыжок из окна — гарантированная травма.',
+            },
+            {
+                'text': 'Толчки прекратились. Первое действие?',
+                'options': [
+                    'Зажечь спичку, чтобы осмотреться',
+                    'Вернуться в квартиру за документами',
+                    'Перекрыть газ и покинуть здание по лестнице',
+                ],
+                'correct': 2,
+                'explain': 'После толчков главные угрозы — утечка газа и обрушения. Открытый огонь недопустим, лифт тоже.',
+            },
+            {
+                'text': 'Землетрясение застало вас на улице. Куда идти?',
+                'options': [
+                    'Под стену здания, чтобы не упасть',
+                    'Прочь от зданий, столбов и проводов',
+                    'Зайти в подъезд ближайшего дома',
+                ],
+                'correct': 1,
+                'explain': 'Главная опасность на улице — падающие конструкции и провода. Нужно открытое пространство.',
+            },
+        ],
+    },
+    'tsunami': {
+        'title': '🌊 Квиз «Цунами»',
+        'questions': [
+            {
+                'text': 'Объявлена тревога цунами, вы на берегу. Действия?',
+                'options': [
+                    'Остаться и снять волну на видео',
+                    'Спуститься в подвал ближайшего дома',
+                    'Немедленно уйти на 2-3 км от берега или на высоту 30-40 м',
+                ],
+                'correct': 2,
+                'explain': 'Счёт идёт на минуты: только удаление от берега или набор высоты спасают. Подвал при затоплении — ловушка.',
+            },
+            {
+                'text': 'Первая волна прошла, море спокойно. Можно возвращаться?',
+                'options': [
+                    'Да, если вода ушла',
+                    'Нет: цунами — это серия волн, опасны и последующие',
+                    'Да, через 10 минут',
+                ],
+                'correct': 1,
+                'explain': 'Первая волна редко самая сильная. Возвращаться можно только после официального отбоя тревоги.',
+            },
+            {
+                'text': 'Природный признак приближения цунами?',
+                'options': [
+                    'Резкий отход воды от берега',
+                    'Сильный дождь',
+                    'Туман над морем',
+                ],
+                'correct': 0,
+                'explain': 'Если море внезапно отступило, обнажив дно, — через минуты придёт волна. Это последний шанс уйти без объявления тревоги.',
+            },
+        ],
+    },
+}
+
+SCHOOL_INTRO = ("**🎓 ШКОЛА БЕЗОПАСНОСТИ**\n\n"
+                "Выберите квиз и проверьте свои знания. "
+                "За каждый верный ответ — балл, в конце — значок!")
+
+
+def quiz_list_menu():
+    menu = []
+    for key, quiz in QUIZZES.items():
+        menu.append([btn(f"🎓 {quiz['title']}", f'quiz_start|{key}')])
+    menu.append([btn("🏠 Главное меню", 'main')])
+    return menu
+
+
+def show_question(chat_id, quiz_id, q_idx, score):
+    quiz = QUIZZES.get(quiz_id)
+    if not quiz or q_idx >= len(quiz['questions']):
+        return
+    q = quiz['questions'][q_idx]
+    buttons = []
+    for i, opt in enumerate(q['options']):
+        buttons.append([btn(opt, f'quiz_ans|{quiz_id}|{q_idx}|{i}|{score}')])
+    buttons.append([btn("❌ Выйти из квиза", 'main')])
+    header = (f"**{quiz['title']}**\n"
+              f"Вопрос {q_idx + 1} из {len(quiz['questions'])} | Счёт: {score}\n\n")
+    send_message(chat_id, header + q['text'], buttons)
+
+
+def handle_quiz_answer(chat_id, quiz_id, q_idx, opt_idx, score):
+    quiz = QUIZZES.get(quiz_id)
+    if not quiz:
+        return
+    q = quiz['questions'][q_idx]
+
+    if opt_idx == q['correct']:
+        score += 1
+        reply = "✅ **Верно!**\n"
+    else:
+        reply = f"❌ **Неверно.** Правильный ответ: {q['options'][q['correct']]}\n"
+    reply += q['explain'] + "\n\n"
+
+    next_idx = q_idx + 1
+    if next_idx < len(quiz['questions']):
+        reply += f"➡️ Впереди следующий вопрос. Ваш счёт: {score}"
+        send_message(chat_id, reply, [
+            [btn("Далее ➡️", f'quiz_next|{quiz_id}|{next_idx}|{score}')],
+            [btn("❌ Выйти из квиза", 'main')],
+        ])
+    else:
+        total = len(quiz['questions'])
+        reply += f"**🏁 Итог: {score} из {total}**\n\n"
+        if score == total:
+            reply += "🏅 **Значок «Знаток безопасности»!** Безупречный результат — поделитесь им с близкими."
+        elif score >= total // 2:
+            reply += "👍 Неплохо! Загляните в разделы, где ошиблись, — и пройдите ещё раз."
+        else:
+            reply += "📚 Стоит повторить материал: введите ключевое слово темы (например, `пожар`) и пройдите квиз снова."
+        send_message(chat_id, reply, [
+            [btn("🔄 Пройти ещё раз", f'quiz_start|{quiz_id}')],
+            [btn("🎓 Все квизы", 'quiz_list')],
+            [btn("🏠 Главное меню", 'main')],
+        ])
+
 
 # =====================================================
 # 🏔️ ТУРИСТИЧЕСКИЕ ТОЧКИ САХАЛИНСКОЙ ОБЛАСТИ
@@ -169,18 +367,24 @@ ROUTES = {
                  'info': 'действующий вулкан, единственное в мире месторождение рения'},
 }
 
+VERDICT_THRESHOLDS = {
+    'mountains': {'warn_gust': 12, 'danger_gust': 18, 'warn_precip': 50, 'danger_precip': 80},
+    'coast':     {'warn_gust': 14, 'danger_gust': 22, 'warn_precip': 50, 'danger_precip': 80},
+    'kurily':    {'warn_gust': 16, 'danger_gust': 25, 'warn_precip': 50, 'danger_precip': 80},
+}
 
-def day_verdict(gusts, precip, t_min):
-    """Вердикт по одному дню: эмодзи-светофор"""
-    if gusts >= 18 or precip >= 80 or t_min <= -18:
+
+def day_verdict(gusts, precip, t_min, cat):
+    th = VERDICT_THRESHOLDS.get(cat, VERDICT_THRESHOLDS['mountains'])
+    if gusts >= th['danger_gust'] or precip >= th['danger_precip'] or t_min <= -18:
         return '❌'
-    if gusts >= 12 or precip >= 50 or t_min <= -10:
+    if gusts >= th['warn_gust'] or precip >= th['warn_precip'] or t_min <= -10:
         return '⚠️'
     return '✅'
 
 
-def verdict_text(gusts, precip, t_min):
-    v = day_verdict(gusts, precip, t_min)
+def verdict_text(gusts, precip, t_min, cat):
+    v = day_verdict(gusts, precip, t_min, cat)
     if v == '❌':
         return v + ' **ОПАСНО:** сильный ветер / непогода. Выход на маршрут лучше перенести.'
     if v == '⚠️':
@@ -189,7 +393,6 @@ def verdict_text(gusts, precip, t_min):
 
 
 def fetch_route_weather(route_key):
-    """Прогноз Open-Meteo на 3 дня по координатам точки"""
     route = ROUTES.get(route_key)
     if not route:
         return None
@@ -200,6 +403,7 @@ def fetch_route_weather(route_key):
         'daily': 'temperature_2m_max,temperature_2m_min,'
                  'precipitation_probability_max,wind_gusts_10m_max',
         'forecast_days': 3,
+        'wind_speed_unit': 'ms',
         'timezone': 'auto',
     }
     try:
@@ -216,13 +420,15 @@ def fetch_route_weather(route_key):
     daily = data.get('daily', {}) or {}
     days = daily.get('time', [])
     labels = ['Сегодня', 'Завтра', 'Послезавтра']
+    cat = route.get('cat', 'mountains')
+
     lines = []
     for i in range(min(3, len(days))):
         t_min = (daily.get('temperature_2m_min') or [None] * 3)[i]
         t_max = (daily.get('temperature_2m_max') or [None] * 3)[i]
         precip = (daily.get('precipitation_probability_max') or [None] * 3)[i] or 0
         gust = (daily.get('wind_gusts_10m_max') or [None] * 3)[i] or 0
-        emoji = day_verdict(gust, precip, t_min or 0)
+        emoji = day_verdict(gust, precip, t_min or 0, cat)
         lines.append(f"{emoji} **{labels[i]}:** {t_min}…{t_max}°C, "
                      f"осадки {precip}%, порывы до {gust} м/с")
 
@@ -234,7 +440,7 @@ def fetch_route_weather(route_key):
             f"**Сейчас:** {cur.get('temperature_2m')}°C, "
             f"ветер {cur.get('wind_speed_10m')} м/с (порывы {cur.get('wind_gusts_10m')})\n\n"
             "**Прогноз на 3 дня:**\n" + "\n".join(lines) + "\n\n"
-            f"**Вердикт на сегодня:** {verdict_text(today_gust, today_precip, today_tmin)}\n"
+            f"**Вердикт на сегодня:** {verdict_text(today_gust, today_precip, today_tmin, cat)}\n"
             f"_данные Open-Meteo, высота точки ≈ {data.get('elevation')} м_")
 
 
@@ -253,10 +459,31 @@ def routes_list_menu(cat):
     menu.append([btn("🏠 Главное меню", 'main')])
     return menu
 
+
+# =====================================================
+# ЛОГИКА ОТВЕТОВ
+# =====================================================
 def handle_command(chat_id, command):
     command = str(command).strip().lower()
 
-    if command in ['/start', 'start', 'main', 'главное меню']:
+    # --- КВИЗЫ: команды с параметрами в payload ---
+    if command.startswith('quiz_'):
+        try:
+            parts = command.split('|')
+            action = parts[0]
+            if action == 'quiz_start' and len(parts) >= 2:
+                show_question(chat_id, parts[1], 0, 0)
+            elif action == 'quiz_next' and len(parts) >= 4:
+                show_question(chat_id, parts[1], int(parts[2]), int(parts[3]))
+            elif action == 'quiz_ans' and len(parts) >= 6:
+                handle_quiz_answer(chat_id, parts[1], int(parts[2]), int(parts[3]), int(parts[4]))
+            elif action == 'quiz_list':
+                send_message(chat_id, SCHOOL_INTRO, quiz_list_menu())
+        except Exception as e:
+            print(f"❌ Квиз ошибка: {e}")
+        return
+
+    if command in ('start', 'main', '/start', 'главное меню'):
         send_message(chat_id,
             "**⚠️ БОТ В ТЕСТОВОМ РЕЖИМЕ**\n\n"
             "Здравствуйте! Это бот Агентства по делам ГО, ЧС и ПБ "
@@ -264,8 +491,8 @@ def handle_command(chat_id, command):
             "**💡 Как пользоваться:**\n"
             "• Выберите раздел через кнопки меню ниже\n"
             "• Или просто введите ключевые слова: `пожар`, `спасатели`, "
-            "`градусник`, `огнетушитель`, `наводнение`, `цунами`, `землетрясение`, `еддс` "
-            "— и мгновенно получите информацию, как действовать\n\n"
+            "`градусник`, `огнетушитель`, `наводнение`, `цунами`, `землетрясение`, "
+            "`еддс`, `погода` — и мгновенно получите информацию\n\n"
             "Для начала работы нажмите кнопку ниже или введите нужное слово:",
             main_menu(),
             image_url=START_IMAGE_URL)
@@ -356,7 +583,7 @@ def handle_command(chat_id, command):
             "• Наденьте резиновые перчатки\n"
             "• Для сбора используйте кисточку, мокрую газету, фольгу, хлебный мякиш, скотч\n"
             "• Соберите ртуть в банку с водой, плотно закройте\n"
-            "• Обработайте место разлива раствором марганцовки, хлорной извести либо горячим мыльно‑содовым раствором (30 г соды + 40 г тёртого мыла на 1 л воды)\n"
+            "• Обработайте место разлива раствором марганцовки, хлорной извести либо горячим мыльно-содовым раствором (30 г соды + 40 г тёртого мыла на 1 л воды)\n"
             "• Когда ртуть собрана, помещение необходимо хорошо проветрить в течение 2-3 часов.",
             back_menu())
 
@@ -383,7 +610,7 @@ def handle_command(chat_id, command):
             "Нажмите кнопку ниже, чтобы перейти к первоисточнику:",
             [
                 [btn_link("🌐 Открыть бот РСЧС Сахалинской области", RSCHS_URL)],
-                [btn("🏠 Главное меню", "main")]
+                [btn("🏠 Главное меню", 'main')],
             ])
 
     elif command in ['contacts', 'контакты', '/contacts']:
@@ -398,31 +625,16 @@ def handle_command(chat_id, command):
     elif command in ['edds', 'еддс', '/edds']:
         send_message(chat_id,
             "**🚨 ЕДДС — Единые дежурные диспетчерские службы Сахалинской области**\n\n"
-            "📞 **Нажмите на номер, чтобы позвонить:**\n\n"
-            "**Александровск-Сахалинский МО:** [8 (42434) 4-44-02](tel:+74243444402)\n"
-            "**Анивский МО:** [8 (42441) 4-15-17](tel:+74244141517)\n"
-            "**Долинский МО:** [8 (42442) 2-80-00](tel:+74244228000)\n"
-            "**Корсаковский МО:** [8 (42435) 4-05-67](tel:+74243540567)\n"
-            "**Курильский МО:** [8 (42454) 4-24-47](tel:+74245442447)\n"
-            "**Макаровский МО:** [8 (42443) 5-05-13](tel:+74244350513)\n"
-            "**Невельский МО:** [8 (42436) 6-09-39](tel:+74243660939)\n"
-            "**Ногликский МО:** [8 (42444) 9-71-59](tel:+74244497159)\n"
-            "**Охинский МО:** [8 (42437) 5-01-41](tel:+74243750141)\n"
-            "**Поронайский МО:** [8 (42431) 4-25-85](tel:+74243142585)\n"
-            "**Северо-Курильский МО:** [8 (42453) 2-11-54](tel:+74245321154)\n"
-            "**Смирныховский МО:** [8 (42452) 4-26-67](tel:+74245242667)\n"
-            "**Томаринский МО:** [8 (42446) 2-62-07](tel:+74244626207)\n"
-            "**Тымовский МО:** [8 (42447) 9-10-44](tel:+74244791044)\n"
-            "**Углегорский МО:** [8 (42432) 4-48-24](tel:+74243244824)\n"
-            "**Холмский МО:** [8 (42433) 2-04-06](tel:+74243320406)\n"
-            "**Южно-Курильский МО:** [8 (42455) 2-26-87](tel:+74245522687)\n"
-            "**Город Южно-Сахалинск:** [112](tel:112)",
+            "📞 **Нажмите на номер, чтобы позвонить:**\n\n" + EDDS_BODY,
             back_menu())
-    
+
     elif command in ['registration', 'регистрация туристских групп', '/registration']:
         send_message(chat_id,
             "📝 Регистрация туристских групп осуществляется на портале МЧС России:",
             [[btn_link("Перейти к регистрации", REGISTRATION_URL)]])
+
+    elif command in ['quiz_list', 'квиз', 'квизы', 'школа', 'уроки', '/quiz']:
+        send_message(chat_id, SCHOOL_INTRO, quiz_list_menu())
 
     elif command in ['routes', 'погода', 'маршруты', '/routes']:
         send_message(chat_id,
@@ -448,11 +660,14 @@ def handle_command(chat_id, command):
                 "⚠️ Не удалось получить погоду сейчас. "
                 "Попробуйте через пару минут.",
                 routes_cat_menu())
-    
+
     else:
         send_message(chat_id, "Я вас не понял. Используйте кнопки меню или ключевые слова:", main_menu())
 
 
+# =====================================================
+# ОБРАБОТЧИК WEBHOOK
+# =====================================================
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
         content_length = int(self.headers.get('Content-Length', 0))
@@ -476,7 +691,7 @@ class handler(BaseHTTPRequestHandler):
                         "группу на портале МЧС России:",
                         [[btn_link("Перейти к регистрации", REGISTRATION_URL)]])
                 else:
-                    handle_command(chat_id, '/start')
+                    handle_command(chat_id, 'start')
 
             elif update_type == 'message_created':
                 body = message.get('body', {})
