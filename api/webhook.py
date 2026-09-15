@@ -122,6 +122,7 @@ COMMAND_WORDS = [
     'что делать при чс',
     'главное меню', 'main',
     'погода', 'маршруты',
+    'привет', 'здравствуй', 'здравствуйте', 'добрый день', 'hello', 'hi',
 ]
 
 
@@ -290,7 +291,7 @@ def routes_list_menu(cat):
 def handle_command(chat_id, command):
     command = str(command).strip().lower()
 
-    if command in ('start', 'main', '/start', 'главное меню'):
+    if command in ('start', 'main', '/start', 'главное меню', 'привет', 'здравствуй', 'здравствуйте', 'добрый день', 'hello', 'hi'):
         send_message(chat_id,
             "**⚠️ БОТ В ТЕСТОВОМ РЕЖИМЕ**\n\n"
             "Здравствуйте! Это бот Агентства по делам ГО, ЧС и ПБ "
