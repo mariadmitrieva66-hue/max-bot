@@ -161,6 +161,7 @@ ROUTE_CATS = {
     'mountains': '⛰️ Горы и хребты',
     'coast': '🌊 Побережье и бухты',
     'kurily': '🌋 Курильские острова',
+    'nature': '🌲 Реки и источники',
 }
 
 ROUTES = {
@@ -190,12 +191,21 @@ ROUTES = {
               'info': '28 км пемзовых белых скал вдоль Охотского моря'},
     'stolbchaty': {'name': 'Мыс Столбчатый (Кунашир)', 'cat': 'kurily', 'lat': 44.0256, 'lon': 145.6762,
                    'info': 'базальтовые колонны-«органы», визитная карточка Курил'},
+    'krilion': {'name': 'Мыс Крыльон', 'cat': 'coast', 'lat': 46.0528, 'lon': 142.1250,
+                'info': 'южная оконечность Сахалина, маяк, стык Охотского и Японского морей'},
+    'kovrizhka': {'name': 'Гора Коврижка (Макаров)', 'cat': 'mountains', 'lat': 48.6330, 'lon': 142.7830,
+                  'info': 'останец со смотровой площадкой над Макаровом и морем'},
+    'bykov': {'name': 'Быковские пороги', 'cat': 'nature', 'lat': 47.3376, 'lon': 142.5155,
+              'info': 'каскад порогов и мини-водопадов на реке Красноярке у пос. Быков'},
+    'lesogorsk': {'name': 'Лесогорские термальные источники', 'cat': 'nature', 'lat': 49.3202, 'lon': 142.3898,
+                  'info': 'горячие источники 35-39°C, Углегорский округ; после циклонов уточняйте проходимость'},
 }
 
 VERDICT_THRESHOLDS = {
     'mountains': {'warn_gust': 12, 'danger_gust': 18, 'warn_precip': 50, 'danger_precip': 80},
     'coast':     {'warn_gust': 14, 'danger_gust': 22, 'warn_precip': 50, 'danger_precip': 80},
     'kurily':    {'warn_gust': 16, 'danger_gust': 25, 'warn_precip': 50, 'danger_precip': 80},
+    'nature':    {'warn_gust': 12, 'danger_gust': 18, 'warn_precip': 50, 'danger_precip': 80},
 }
 
 
