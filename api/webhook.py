@@ -59,10 +59,33 @@ def stats_track(chat_id, event_type, command=None):
         requests.post(f'{base}/sadd/stats:users:{today}', headers=headers, json=[chat_id], timeout=5)
         if command:
             requests.post(f'{base}/incr/stats:cmd:{command}:{today}', headers=headers, timeout=5)
+            requests.post(f'{base}/incr/user:{chat_id}:cmd:{command}', headers=headers, timeout=5)
         requests.post(f'{base}/set/user:{chat_id}:last', headers=headers,
                       json=[time.strftime('%Y-%m-%d %H:%M:%S')], timeout=5)
+        requests.post(f'{base}/incr/user:{chat_id}:actions', headers=headers, timeout=5)
+        requests.post(f'{base}/zincrby/stats:top:{today}/1/{chat_id}', headers=headers, timeout=5)
+        requests.post(f'{base}/setnx/user:{chat_id}:first', headers=headers,
+                      json=[time.strftime('%Y-%m-%d')], timeout=5)
     except Exception as e:
         print(f'⚠️ Stats error: {e}')
+
+
+def _stats_get_num(base, headers, key):
+    r = requests.get(f'{base}/get/{key}', headers=headers, timeout=5).json()
+    return int(r.get('result') or 0)
+
+
+def _stats_get_users(base, headers, date):
+    r = requests.get(f'{base}/scard/stats:users:{date}', headers=headers, timeout=5).json()
+    return int(r.get('result') or 0)
+
+
+def _stats_delta(cur, prev):
+    if prev == 0:
+        return '—' if cur == 0 else '🆕'
+    pct = round((cur - prev) / prev * 100)
+    sign = '+' if pct >= 0 else ''
+    return f'{sign}{pct}%'
 
 
 def stats_get_summary():
@@ -71,30 +94,124 @@ def stats_get_summary():
     if not base or not token:
         return "База статистики не настроена"
     headers = {'Authorization': f'Bearer {token}'}
-    today = time.strftime('%Y-%m-%d')
     try:
-        total_r = requests.get(f'{base}/get/stats:total:{today}', headers=headers, timeout=5).json()
-        total_today = int(total_r.get('result') or 0)
-        users_r = requests.get(f'{base}/scard/stats:users:{today}', headers=headers, timeout=5).json()
-        users_today = int(users_r.get('result') or 0)
+        today = time.strftime('%Y-%m-%d')
+        yesterday = time.strftime('%Y-%m-%d', time.localtime(time.time() - 86400))
+
+        t_total = _stats_get_num(base, headers, f'stats:total:{today}')
+        t_users = _stats_get_users(base, headers, today)
+        y_total = _stats_get_num(base, headers, f'stats:total:{yesterday}')
+        y_users = _stats_get_users(base, headers, yesterday)
+
+        w_total = 0
+        w_visits = 0
+        for i in range(7):
+            d = time.strftime('%Y-%m-%d', time.localtime(time.time() - i * 86400))
+            w_total += _stats_get_num(base, headers, f'stats:total:{d}')
+            w_visits += _stats_get_users(base, headers, d)
+
         top_cmds = {}
         for cmd in ['fire', 'flood', 'earthquake', 'edds', 'routes', 'checklists',
                     'lost_forest', 'terrorism', 'school', 'frostbite', 'bite',
-                    'firstaid', 'cpr', 'seizure']:
-            cmd_r = requests.get(f'{base}/get/stats:cmd:{cmd}:{today}', headers=headers, timeout=5).json()
-            count = int(cmd_r.get('result') or 0)
+                    'firstaid', 'cpr', 'seizure', 'volunteer']:
+            count = _stats_get_num(base, headers, f'stats:cmd:{cmd}:{today}')
             if count > 0:
                 top_cmds[cmd] = count
         top_sorted = sorted(top_cmds.items(), key=lambda x: x[1], reverse=True)[:5]
         top_text = '\n'.join([f"• `{cmd}` — {count}" for cmd, count in top_sorted]) or 'Пока нет данных'
+
         return (f"**📊 СТАТИСТИКА**\n\n"
-                f"**За сегодня ({today}):**\n"
-                f"• Всего сообщений: **{total_today}**\n"
-                f"• Уникальных пользователей: **{users_today}**\n\n"
+                f"**Сегодня ({today}):**\n"
+                f"• Сообщений: **{t_total}** ({_stats_delta(t_total, y_total)} к вчера)\n"
+                f"• Пользователей: **{t_users}** ({_stats_delta(t_users, y_users)} к вчера)\n\n"
+                f"**Вчера ({yesterday}):**\n"
+                f"• Сообщений: **{y_total}**\n"
+                f"• Пользователей: **{y_users}**\n\n"
+                f"**За 7 дней:**\n"
+                f"• Сообщений: **{w_total}** (в среднем {round(w_total / 7)} в день)\n"
+                f"• Визитов: **{w_visits}** (сумма по дням)\n\n"
                 f"**Топ-5 команд сегодня:**\n{top_text}")
     except Exception as e:
         return f"Ошибка при получении статистики: {e}"
 
+
+def stats_user_info(target):
+    base = os.getenv('UPSTASH_REDIS_REST_URL')
+    token = os.getenv('UPSTASH_REDIS_REST_TOKEN')
+    if not base or not token:
+        return "База статистики не настроена"
+    headers = {'Authorization': f'Bearer {token}'}
+    try:
+        def get(key):
+            r = requests.get(f'{base}/get/{key}', headers=headers, timeout=5).json()
+            return r.get('result')
+
+        last = get(f'user:{target}:last') or 'нет данных'
+        first = get(f'user:{target}:first') or 'нет данных (пользователь был до ввода карточек)'
+        actions = int(get(f'user:{target}:actions') or 0)
+
+        top_cmds = {}
+        for cmd in ['fire', 'flood', 'earthquake', 'edds', 'routes', 'checklists',
+                    'lost_forest', 'terrorism', 'school', 'frostbite', 'bite',
+                    'firstaid', 'cpr', 'bleeding', 'choking', 'stroke', 'seizure', 'volunteer']:
+            c = int(get(f'user:{target}:cmd:{cmd}') or 0)
+            if c > 0:
+                top_cmds[cmd] = c
+        if top_cmds:
+            fav = max(top_cmds, key=top_cmds.get)
+            fav_text = f"`{fav}` ({top_cmds[fav]} раз)"
+        else:
+            fav_text = 'нет данных'
+
+        return (f"**👤 Карточка пользователя #{target}**\n"
+                f"• Первый визит: {first}\n"
+                f"• Последняя активность: {last}\n"
+                f"• Всего действий: **{actions}**\n"
+                f"• Любимая тема: {fav_text}")
+    except Exception as e:
+        return f'Ошибка: {e}'
+
+def stats_top_users():
+    base = os.getenv('UPSTASH_REDIS_REST_URL')
+    token = os.getenv('UPSTASH_REDIS_REST_TOKEN')
+    if not base or not token:
+        return "База статистики не настроена"
+    headers = {'Authorization': f'Bearer {token}'}
+    try:
+        def ztop(date, limit):
+            r = requests.get(f'{base}/zrevrange/stats:top:{date}/0/{limit - 1}/WITHSCORES',
+                             headers=headers, timeout=5).json()
+            res = r.get('result') or []
+            pairs = []
+            for i in range(0, len(res), 2):
+                pairs.append((res[i], int(float(res[i + 1]))))
+            return pairs
+
+        today = time.strftime('%Y-%m-%d')
+        day_pairs = ztop(today, 10)
+
+        week = {}
+        for i in range(7):
+            d = time.strftime('%Y-%m-%d', time.localtime(time.time() - i * 86400))
+            for uid, sc in ztop(d, 50):
+                week[uid] = week.get(uid, 0) + sc
+        week_sorted = sorted(week.items(), key=lambda x: x[1], reverse=True)[:10]
+
+        def fmt(pairs):
+            if not pairs:
+                return 'Пока нет данных'
+            return '\n'.join([f"{n}. `#{uid}` — {sc}" for n, (uid, sc) in enumerate(pairs, 1)])
+
+        return (f"**🏆 ТОП АКТИВНЫХ ПОЛЬЗОВАТЕЛЕЙ**\n\n"
+                f"**За сегодня:**\n{fmt(day_pairs)}\n\n"
+                f"**За 7 дней:**\n{fmt(week_sorted)}\n\n"
+                f"_Карточка пользователя: `/user <id>`_")
+    except Exception as e:
+        return f'Ошибка: {e}'
+         
+        if command in ['/top', 'топ', 'топ пользователей'] and str(chat_id) in ADMIN_CHAT_IDS:
+        send_message(chat_id, stats_top_users(), back_menu())
+        return
 
 # =====================================================
 # ОТПРАВКА СООБЩЕНИЙ
@@ -551,6 +668,11 @@ def handle_command(chat_id, command, message_id=None):
         send_message(chat_id, stats_get_summary(), back_menu())
         return
 
+    if command.startswith('/user ') and str(chat_id) in ADMIN_CHAT_IDS:
+        target = command.split(' ', 1)[1].strip()
+        send_message(chat_id, stats_user_info(target), back_menu())
+        return
+    
     if command in ('start', 'main', '/start', 'главное меню', 'привет', 'здравствуй', 'здравствуйте', 'добрый день', 'hello', 'hi'):
         send_message(chat_id,
             "Привет!😊 Я бот Агентства по делам ГО, ЧС и ПБ Сахалинской области.\n\n"
