@@ -120,12 +120,12 @@ def send_message(chat_id, text, buttons=None, image_url=None):
             payload['attachments'] = attachments
         return payload
 
-    response = requests.post(url, headers=headers, json=build_payload(True), timeout=10, verify=False)
+    response = requests.post(url, headers=headers, json=build_payload(True), timeout=5, verify=False)
     print(f"📤 ОТВЕТ MAX API: {response.status_code} | {response.text}")
 
     if response.status_code == 400 and 'image' in response.text.lower():
         print("⚠️ Картинка не загрузилась, повторяю отправку БЕЗ картинки")
-        response = requests.post(url, headers=headers, json=build_payload(False), timeout=10, verify=False)
+        response = requests.post(url, headers=headers, json=build_payload(False), timeout=5, verify=False)
         print(f"📤 ОТВЕТ MAX API (без картинки): {response.status_code} | {response.text}")
     return response
 
@@ -349,7 +349,7 @@ def fetch_route_weather(route_key):
         'timezone': 'auto',
     }
     try:
-        r = requests.get('https://api.open-meteo.com/v1/forecast', params=params, timeout=10)
+        r = requests.get('https://api.open-meteo.com/v1/forecast', params=params, timeout=5)
         if r.status_code != 200:
             print(f'⚠️ Open-Meteo: статус {r.status_code}')
             return None
