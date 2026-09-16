@@ -209,10 +209,6 @@ def stats_top_users():
     except Exception as e:
         return f'Ошибка: {e}'
          
-        if command in ['/top', 'топ', 'топ пользователей'] and str(chat_id) in ADMIN_CHAT_IDS:
-        send_message(chat_id, stats_top_users(), back_menu())
-        return
-
 # =====================================================
 # ОТПРАВКА СООБЩЕНИЙ
 # =====================================================
@@ -671,6 +667,10 @@ def handle_command(chat_id, command, message_id=None):
     if command.startswith('/user ') and str(chat_id) in ADMIN_CHAT_IDS:
         target = command.split(' ', 1)[1].strip()
         send_message(chat_id, stats_user_info(target), back_menu())
+        return
+
+    if command in ['/top', 'топ', 'топ пользователей'] and str(chat_id) in ADMIN_CHAT_IDS:
+        send_message(chat_id, stats_top_users(), back_menu())
         return
     
     if command in ('start', 'main', '/start', 'главное меню', 'привет', 'здравствуй', 'здравствуйте', 'добрый день', 'hello', 'hi'):
