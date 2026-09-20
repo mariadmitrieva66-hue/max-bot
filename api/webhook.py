@@ -264,7 +264,8 @@ def main_menu():
         [btn("📋 Чек-листы", 'checklists')],
         [btn("🎒 Школьникам", 'school')],
         [btn_link("📝 Регистрация туристских групп", REGISTRATION_URL)],
-        [btn("🙋‍♂️ Я — доброволец!", 'volunteer')],
+        [btn("🙋♂️ Я — доброволец!", 'volunteer')],
+        [btn("📍 Пункты экстренной связи", 'sos_points')],
         [btn("📞 Контакты", 'contacts')],
     ]
 
