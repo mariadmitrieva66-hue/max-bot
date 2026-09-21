@@ -2,6 +2,8 @@ import json
 import os
 import time
 import difflib
+import threading
+from concurrent.futures import ThreadPoolExecutor
 import requests
 import urllib3
 from http.server import BaseHTTPRequestHandler
@@ -49,27 +51,48 @@ FIRSTAID_NOTE = ("_⚠️ Информация носит справочный �
 # 📊 СТАТИСТИКА
 # =====================================================
 def stats_track(chat_id, event_type, command=None):
-    base = os.getenv('UPSTASH_REDIS_REST_URL')
-    token = os.getenv('UPSTASH_REDIS_REST_TOKEN')
-    if not base or not token:
-        return
-    headers = {'Authorization': f'Bearer {token}'}
-    today = time.strftime('%Y-%m-%d')
-    try:
-        requests.post(f'{base}/incr/stats:total:{today}', headers=headers, timeout=5)
-        requests.post(f'{base}/sadd/stats:users:{today}', headers=headers, json=[chat_id], timeout=5)
-        if command:
-            requests.post(f'{base}/incr/stats:cmd:{command}:{today}', headers=headers, timeout=5)
-            requests.post(f'{base}/incr/user:{chat_id}:cmd:{command}', headers=headers, timeout=5)
-        requests.post(f'{base}/set/user:{chat_id}:last', headers=headers,
-                      json=[time.strftime('%Y-%m-%d %H:%M:%S')], timeout=5)
-        requests.post(f'{base}/incr/user:{chat_id}:actions', headers=headers, timeout=5)
-        requests.post(f'{base}/zincrby/stats:top:{today}/1/{chat_id}', headers=headers, timeout=5)
-        requests.post(f'{base}/setnx/user:{chat_id}:first', headers=headers,
-                      json=[time.strftime('%Y-%m-%d')], timeout=5)
-    except Exception as e:
-        print(f'⚠️ Stats error: {e}')
+    """Запускается в отдельном потоке, не блокирует ответ пользователю."""
+    def _do():
+        base = os.getenv('UPSTASH_REDIS_REST_URL')
+        token = os.getenv('UPSTASH_REDIS_REST_TOKEN')
+        if not base or not token:
+            return
+        headers = {'Authorization': f'Bearer {token}'}
+        today = time.strftime('%Y-%m-%d')
+        try:
+            # Параллельные запросы через ThreadPool — в разы быстрее
+            with ThreadPoolExecutor(max_workers=8) as pool:
+                f = []
+                f.append(pool.submit(requests.post, f'{base}/incr/stats:total:{today}',
+                                     headers=headers, timeout=3))
+                f.append(pool.submit(requests.post, f'{base}/sadd/stats:users:{today}',
+                                     headers=headers, json=[chat_id], timeout=3))
+                if command:
+                    f.append(pool.submit(requests.post, f'{base}/incr/stats:cmd:{command}:{today}',
+                                         headers=headers, timeout=3))
+                    f.append(pool.submit(requests.post, f'{base}/incr/user:{chat_id}:cmd:{command}',
+                                         headers=headers, timeout=3))
+                f.append(pool.submit(requests.post, f'{base}/set/user:{chat_id}:last',
+                                     headers=headers,
+                                     json=[time.strftime('%Y-%m-%d %H:%M:%S')], timeout=3))
+                f.append(pool.submit(requests.post, f'{base}/incr/user:{chat_id}:actions',
+                                     headers=headers, timeout=3))
+                f.append(pool.submit(requests.post, f'{base}/zincrby/stats:top:{today}/1/{chat_id}',
+                                     headers=headers, timeout=3))
+                f.append(pool.submit(requests.post, f'{base}/setnx/user:{chat_id}:first',
+                                     headers=headers,
+                                     json=[time.strftime('%Y-%m-%d')], timeout=3))
+                # Ждём завершения всех (максимум 3 сек)
+                for fut in f:
+                    try:
+                        fut.result(timeout=3)
+                    except Exception:
+                        pass
+        except Exception as e:
+            print(f'⚠️ Stats error: {e}')
 
+    # Запускаем в отдельном потоке — не блокирует основной
+    threading.Thread(target=_do, daemon=True).start()
 
 def _stats_get_num(base, headers, key):
     r = requests.get(f'{base}/get/{key}', headers=headers, timeout=5).json()
@@ -234,12 +257,12 @@ def send_message(chat_id, text, buttons=None, image_url=None):
             payload['attachments'] = attachments
         return payload
 
-    response = requests.post(url, headers=headers, json=build_payload(True), timeout=5, verify=False)
+    response = requests.post(url, headers=headers, json=build_payload(True), timeout=3, verify=False)
     print(f"📤 ОТВЕТ MAX API: {response.status_code} | {response.text}")
 
     if response.status_code == 400 and 'image' in response.text.lower():
         print("⚠️ Картинка не загрузилась, повторяю отправку БЕЗ картинки")
-        response = requests.post(url, headers=headers, json=build_payload(False), timeout=5, verify=False)
+        response = requests.post(url, headers=headers, json=build_payload(False), timeout=3, verify=False)
         print(f"📤 ОТВЕТ MAX API (без картинки): {response.status_code} | {response.text}")
     return response
 
